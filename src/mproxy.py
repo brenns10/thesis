@@ -22,11 +22,11 @@ SNAT_REMOVE_COMMAND = (
     '--dport {server_port} -j SNAT --to {detour_ip}'
 )
 DNAT_COMMAND = (
-    'iptables -t nat -A PREROUTING -s {client_ip} -d {detour_ip} -p tcp'
+    'iptables -t nat -A PREROUTING -s {client_ip} -d {detour_ip} -p tcp '
     '--dport {detour_port} -j DNAT --to {server_ip}:{server_port}'
 )
 DNAT_REMOVE_COMMAND = (
-    'iptables -t nat -D PREROUTING -s {client_ip} -d {detour_ip} -p tcp'
+    'iptables -t nat -D PREROUTING -s {client_ip} -d {detour_ip} -p tcp '
     '--dport {detour_port} -j DNAT --to {server_ip}:{server_port}'
 )
 REQUEST_FORMAT = '!4sHH'
@@ -92,7 +92,7 @@ class MProxy(object):
 
     def clean_up(self):
         """Delete all rules we have created."""
-        for frozen in self._entries:
+        for frozen in list(self._entries):
             self.del_rules(self.thaw(frozen))
 
     def serve(self):
@@ -104,7 +104,7 @@ class MProxy(object):
         msg_size = struct.calcsize(REQUEST_FORMAT)
         try:
             while True:
-                data, addr = s.recv(msg_size)
+                data, addr = s.recvfrom(msg_size)
                 assert(len(data) == msg_size)
                 self.handle_request(data, addr)
         finally:
