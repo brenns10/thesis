@@ -5,9 +5,9 @@ This document describes how to get the detour point running. Unlike the client,
 there is no need for a virtual machine, and the requirements are dramatically
 simpler.
 
-It is entirely possible to run the detour on the same machine as the client
-virtual machine. Just note that an additional interface (e.g. wireless, or yet
-another emulated NIC on the bridge) is required for the host machine.
+I have not successfully gotten everything working with the detour on the same
+machine as the client, which is not a problem, but it does mean that you'll
+need to have a second computer for setting up the detour.
 
 Prerequisites
 -------------

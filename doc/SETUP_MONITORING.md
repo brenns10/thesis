@@ -56,3 +56,14 @@ wireshark -k -i /tmp/capture
 
 Note that whenever you restart the capture you must restart Wireshark and vice
 versa.
+
+One Liner
+---------
+
+```bash
+ssh admin@192.168.0.1 tcpdump -U -s0 -n -w - -i br0 \
+    "host 130.104.230.45 or host 192.168.0.90"      \
+| wireshark -k -i -
+```
+
+This is handy because this way you can restart everything together.
