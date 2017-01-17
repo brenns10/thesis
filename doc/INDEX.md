@@ -1,6 +1,6 @@
 Documentation
 =============
 
-- [SETUP_CLIENT.md]()
-- [SETUP_DETOUR.md]()
-- [SETUP_MONITORING.md]()
+- [SETUP_CLIENT.md](SETUP_CLIENT.md)
+- [SETUP_DETOUR.md](SETUP_DETOUR.md)
+- [SETUP_MONITORING.md](SETUP_MONITORING.md)
