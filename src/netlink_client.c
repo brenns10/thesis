@@ -1,14 +1,16 @@
 /*
  * Runs on the client and sends messages to the detour kernel module.
  * build: gcc netlink_client.c -o netlink_client $(pkg-config --cflags --libs libnl-3.0)
- * run: ./netlink_client FAMILY_NUM COMMAND_NUM
+ * run: ./netlink_client COMMAND_NUM
  */
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <netlink/netlink.h>
 #include <netlink/genl/genl.h>
+#include <netlink/genl/ctrl.h>
 
+#define DETOUR_FAMILY "DETOUR"
 #define DETOUR_VERSION 1
 
 /*
@@ -16,7 +18,7 @@
  */
 void usage(char *name)
 {
-	fprintf(stderr, "usage: %s FAMILY_NUM COMMAND_NUM\n", name);
+	fprintf(stderr, "usage: %s COMMAND_NUM\n", name);
 	fprintf(stderr, "Send a message to the MPTCP detour kernel module.\n");
 	exit(EXIT_FAILURE);
 }
@@ -31,13 +33,12 @@ int main(int argc, char *argv[])
 	struct nl_sock *sk;
 	int rc;
 
-	if (argc < 3)
+	if (argc < 2)
 		usage(argv[0]);
 
-	family = atoi(argv[1]);
-	cmd = (uint8_t)atoi(argv[2]);
-	if (!family || !cmd)
-		fprintf(stderr, "family or cmd was 0, may be error...\n");
+	cmd = (uint8_t)atoi(argv[1]);
+	if (!cmd)
+		fprintf(stderr, "cmd was 0, may be error...\n");
 
 	sk = nl_socket_alloc();
 	if (!sk) {
@@ -50,6 +51,15 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "genl_connect failed: %d\n", rc);
 		rc = EXIT_FAILURE;
 		goto exit;
+	}
+
+	family = genl_ctrl_resolve(sk, DETOUR_FAMILY);
+	if (family < 0) {
+		fprintf(stderr, "genl_ctrl_resolve failed: %d\n", family);
+		rc = EXIT_FAILURE;
+		goto exit;
+	} else {
+		printf("resolved family %s to %d\n", DETOUR_FAMILY, family);
 	}
 
 	rc = genl_send_simple(sk, family, cmd, DETOUR_VERSION, 0);
