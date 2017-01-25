@@ -1,6 +1,6 @@
 /*
  * Runs on the client and sends messages to the detour kernel module.
- * build: gcc netlink_client.c -o netlink_client $(pkg-config --cflags --libs libnl-3.0)
+ * build: make netlink_client
  * run: ./netlink_client COMMAND_NUM
  */
 
