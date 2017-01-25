@@ -28,7 +28,7 @@ this is concerning because it isn't minimal, and I don't have a good
 understanding of how to reproduce it (I don't even remember how I made the
 current config).
 
-A better way is to merge fragments of configurations on top of the alldefconfig.
+A better way is to merge fragments of configurations on top of the allnoconfig.
 Currently I have several fragments in my `etc/` folder.
 
 - `vido.frag` - requirements for vido
@@ -38,7 +38,47 @@ Currently I have several fragments in my `etc/` folder.
 From the root of the linux directory, we can build a configuration as follows:
 
 ```bash
-scripts/kconfig/merge_config.sh \
+scripts/kconfig/merge_config.sh -n \
     arch/x86/configs/kvm_guest.config \
     ../thesis/etc/*.frag
 ```
+
+Benchmarks
+----------
+
+Comparisons of build time and kernel size for various configurations.
+
+- Merged configuration, based on alldefconfig
+
+        Setup is 15740 bytes (padded to 15872 bytes).
+        System is 2351 kB
+        CRC a2b9d51a
+        Kernel: arch/x86/boot/bzImage is ready  (#26)
+
+        real	3m1.687s
+        user	10m6.257s
+        sys	0m38.187s
+
+- Merged configuration, based on allnoconfig
+
+        Setup is 15708 bytes (padded to 15872 bytes).
+        System is 1524 kB
+        CRC 4ac41c26
+        Kernel: arch/x86/boot/bzImage is ready  (#27)
+
+        real	2m13.621s
+        user	7m19.687s
+        sys	0m29.013s
+
+- Old configuration
+
+        Setup is 15772 bytes (padded to 15872 bytes).
+        System is 6116 kB
+        CRC a6a39451
+        Kernel: arch/x86/boot/bzImage is ready  (#25)
+
+        real	6m23.239s
+        user	20m37.223s
+        sys	1m12.457s
+
+Thus we use the merged configuration based on allnoconfig.
