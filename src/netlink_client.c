@@ -32,14 +32,13 @@ enum {
 };
 enum {
 	DETOUR_A_UNSPEC,
-	DETOUR_A_MSG,
 	DETOUR_A_DETOUR_IP,
 	DETOUR_A_DETOUR_PORT,
 	DETOUR_A_REMOTE_IP,
 	DETOUR_A_REMOTE_PORT,
 };
 
-int detour_echo(struct nl_sock *sk, int family, char *text)
+int detour_echo(struct nl_sock *sk, int family)
 {
 	int rc = -1;
 	struct nl_msg *msg = nlmsg_alloc();
@@ -53,7 +52,6 @@ int detour_echo(struct nl_sock *sk, int family, char *text)
 		fprintf(stderr, "genlmsg_put() failed\n");
 		goto nla_put_failure;
 	}
-	NLA_PUT_STRING(msg, DETOUR_A_MSG, text);
 
 	rc = nl_send_sync(sk, msg);
 	if (rc)
@@ -95,11 +93,7 @@ nla_put_failure:
 /* Call DETOUR_C_ECHO, either using CLI provided string or a default. */
 int cli_echo(struct nl_sock *sk, int family, int argc, char *argv[])
 {
-	if (argc == 3) {
-		return detour_echo(sk, family, argv[2]);
-	} else {
-		return detour_echo(sk, family, "hello from userspace!");
-	}
+	return detour_echo(sk, family);
 }
 
 /* Call DETOUR_C_ADD, using arguments from CLI. */
