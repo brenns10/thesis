@@ -9,6 +9,9 @@ UI
 --
 
 - `SPC t f` - show the 80 column guide
+- `SPC w t` - toggle window "dedicated". i.e. force it to stay in the same frame
+- `SPC l [number]` - change layers
+- `SPC p l` - create a layer from a git project
 
 Tags
 ----
