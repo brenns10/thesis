@@ -19,3 +19,8 @@ Netlink
 - libnl homepage https://www.infradead.org/~tgr/libnl/
 - SO question that helped guide me in message construction
   http://stackoverflow.com/questions/21601521/how-to-use-the-libnl-library-to-trigger-nl80211-commands
+
+Misc
+----
+
+- Overview of MPTCP kernel design https://events.linuxfoundation.org/images/stories/pdf/lcna_co2012_paasch.pdf
