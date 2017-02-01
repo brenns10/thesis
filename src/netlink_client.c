@@ -14,13 +14,16 @@
 
 #include <netlink/netlink.h>
 #include <netlink/attr.h>
+#include <netlink/handlers.h>
 #include <netlink/genl/genl.h>
 #include <netlink/genl/ctrl.h>
 
+#define MAX_CALLS 5
 /*
  * The following are shamelessly taken from the kernel code.
  */
 #define DETOUR_FAMILY "DETOUR"
+#define DETOUR_GROUP "detour_req"
 #define DETOUR_VERSION 1
 enum {
 	DETOUR_C_UNSPEC,
@@ -36,7 +39,16 @@ enum {
 	DETOUR_A_DETOUR_PORT,
 	DETOUR_A_REMOTE_IP,
 	DETOUR_A_REMOTE_PORT,
+	__DETOUR_A_MAX,
 };
+#define DETOUR_A_MAX (__DETOUR_A_MAX - 1)
+static struct nla_policy detour_genl_policy[DETOUR_A_MAX + 1] = {
+	[DETOUR_A_DETOUR_IP] = { .type = NLA_U32 },
+	[DETOUR_A_DETOUR_PORT] = { .type = NLA_U16 },
+	[DETOUR_A_REMOTE_IP] = { .type = NLA_U32 },
+	[DETOUR_A_REMOTE_PORT] = { .type = NLA_U16 },
+};
+
 
 int detour_echo(struct nl_sock *sk, int family)
 {
@@ -90,6 +102,34 @@ nla_put_failure:
 	return rc;
 }
 
+int detour_req_cb(struct nl_msg *msg, void *arg)
+{
+	static int calls = 0;
+	struct nlattr *attrs[DETOUR_A_MAX + 1];
+	struct nlmsghdr *nlh = nlmsg_hdr(msg);
+	struct in_addr rip;
+	unsigned short rpt;
+	int rc = genlmsg_parse(nlh, 0, attrs, DETOUR_A_MAX, detour_genl_policy);
+	if (rc < 0) {
+		fprintf(stderr, "genlmsg_parse() failed (%d)\n", rc);
+		return NL_STOP;
+	}
+	if (!attrs[DETOUR_A_REMOTE_IP] || !attrs[DETOUR_A_REMOTE_PORT]) {
+		fprintf(stderr, "did not receive all necessary attributes\n");
+		return NL_STOP;
+	}
+	rip.s_addr = nla_get_u32(attrs[DETOUR_A_REMOTE_IP]);
+	rpt = nla_get_u16(attrs[DETOUR_A_REMOTE_PORT]);
+	rpt = ntohs(rpt);
+	printf("DETOUR_C_REQ: %s:%u", inet_ntoa(rip), rpt);
+	if (++calls == MAX_CALLS) {
+		calls = 0;
+		return NL_STOP;
+	} else {
+		return 0;
+	}
+}
+
 /* Call DETOUR_C_ECHO, either using CLI provided string or a default. */
 int cli_echo(struct nl_sock *sk, int family, int argc, char *argv[])
 {
@@ -97,14 +137,14 @@ int cli_echo(struct nl_sock *sk, int family, int argc, char *argv[])
 }
 
 /* Call DETOUR_C_ADD, using arguments from CLI. */
-int cli_add_or_del(struct nl_sock *sk, int family, int argc, char *argv[6],
+int cli_add_or_del(struct nl_sock *sk, int family, int argc, char *argv[],
                    uint8_t cmd)
 {
 	struct in_addr dip, rip;
 	uint16_t dpt, rpt;
 	if (argc != 6) {
 		fprintf(stderr, "add requires 4 arguments\n");
-		fprintf(stderr, "%s %s DIP DPT RIP RPT");
+		fprintf(stderr, "%s %s DIP DPT RIP RPT", argv[0], argv[1]);
 		return -1;
 	}
 	if (!inet_aton(argv[2], &dip) || !inet_aton(argv[4], &rip)) {
@@ -123,12 +163,36 @@ int cli_add_or_del(struct nl_sock *sk, int family, int argc, char *argv[6],
 	return detour_add_or_del(sk, family, &dip, dpt, &rip, rpt, cmd);
 }
 
+/* Loop waiting for DETOUR_C_REQ messages from the kernel and print them. */
+int cli_req(struct nl_sock *sk, int group)
+{
+	int rc;
+	struct nl_cb *cb;
+	rc = nl_socket_add_memberships(sk, group, NFNLGRP_NONE);
+	if (rc < 0) {
+		fprintf(stderr, "nl_socket_add_memberships() failed (%d)\n",
+		        rc);
+		return rc;
+	}
+	cb = nl_cb_alloc(NL_CB_CUSTOM);
+	if (!cb) {
+		fprintf(stderr, "nl_cb_alloc() failed\n");
+		return -1;
+	}
+	rc = nl_cb_set(cb, NL_CB_MSG_IN, NL_CB_CUSTOM, detour_req_cb, NULL);
+	if (rc < 0) {
+		fprintf(stderr, "nl_cb_set() failed (%d)\n", rc);
+		return rc;
+	}
+	return nl_recvmsgs(sk, cb);
+}
+
 /*
- * Uses libnl to send an empty message to the given family or command.
+ * uses libnl to send an empty message to the given family or command.
  */
 int main(int argc, char *argv[])
 {
-	int family;
+	int family, group;
 	struct nl_sock *sk;
 	int rc = EXIT_SUCCESS;
 
@@ -157,12 +221,21 @@ int main(int argc, char *argv[])
 		goto exit;
 	}
 
+	group = genl_ctrl_resolve_grp(sk, DETOUR_FAMILY, DETOUR_GROUP);
+	if (group < 0) {
+		fprintf(stderr, "genl_ctrl_resolve_grp failed: %d\n", group);
+		rc = EXIT_FAILURE;
+		goto exit;
+	}
+
 	if (strcmp(argv[1], "echo") == 0) {
 		rc = cli_echo(sk, family, argc, argv);
 	} else if (strcmp(argv[1], "add") == 0) {
 		rc = cli_add_or_del(sk, family, argc, argv, DETOUR_C_ADD);
 	} else if (strcmp(argv[1], "del") == 0) {
 		rc = cli_add_or_del(sk, family, argc, argv, DETOUR_C_DEL);
+	} else if (strcmp(argv[1], "req") == 0) {
+		rc = cli_req(sk, group);
 	} else {
 		fprintf(stderr, "\"%s\" is not a valid command\n", argv[1]);
 		rc = EXIT_FAILURE;
