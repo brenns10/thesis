@@ -18,7 +18,46 @@
 #include <netlink/genl/genl.h>
 #include <netlink/genl/ctrl.h>
 
+/*
+ * How many calls should the DETOUR_C_REQ echo handler listen to before quit?
+ */
 #define MAX_CALLS 5
+
+/*
+ * Format for UDP detour requests.
+ */
+struct detour_request {
+	uint32_t server_ip;
+	uint16_t server_port;
+	uint16_t detour_port;
+};
+
+/*
+ * UDP socket to send requests to. Should be connect()-ed so all you need to do
+ * is send(), not sendto().
+ */
+int detour_sk;
+
+/*
+ * netlink family
+ */
+int family;
+
+/*
+ * netlink group
+ */
+int group;
+
+/*
+ * address of detour daemon
+ */
+struct sockaddr_in detour_addr;
+
+/*
+ * What port is the detour listening on? Should be this.
+ */
+#define DETOUR_DEFAULT_PORT 45672
+
 /*
  * The following are shamelessly taken from the kernel code.
  */
@@ -50,7 +89,7 @@ static struct nla_policy detour_genl_policy[DETOUR_A_MAX + 1] = {
 };
 
 
-int detour_echo(struct nl_sock *sk, int family)
+int detour_echo(struct nl_sock *sk)
 {
 	int rc = -1;
 	struct nl_msg *msg = nlmsg_alloc();
@@ -73,7 +112,7 @@ nla_put_failure: // needed by NLA_PUT_X macros
 	return rc;
 }
 
-int detour_add_or_del(struct nl_sock *sk, int family, struct in_addr *dip,
+int detour_add_or_del(struct nl_sock *sk, struct in_addr *dip,
                       uint16_t dpt, struct in_addr *rip, uint16_t rpt,
                       int command) {
 	int rc = -1;
@@ -103,7 +142,11 @@ nla_put_failure:
 	return rc;
 }
 
-int detour_req_cb(struct nl_msg *msg, void *arg)
+/*
+ * Callback function for DETOUR_C_REQ messages. Parses the message and then
+ * echoes it to stdout.
+ */
+int detour_req_echo_cb(struct nl_msg *msg, void *arg)
 {
 	struct nlattr *attrs[DETOUR_A_MAX + 1];
 	struct nlmsghdr *nlh = nlmsg_hdr(msg);
@@ -125,15 +168,54 @@ int detour_req_cb(struct nl_msg *msg, void *arg)
 	return NL_STOP;
 }
 
-/* Call DETOUR_C_ECHO, either using CLI provided string or a default. */
-int cli_echo(struct nl_sock *sk, int family, int argc, char *argv[])
+/*
+ * Callback function for DETOUR_C_REQ messages. Parses the message, requests a
+ * detour via UDP, and then informs the kernel of the new detour.
+ */
+int detour_req_create_cb(struct nl_msg *msg, void *arg)
 {
-	return detour_echo(sk, family);
+	struct nlattr *attrs[DETOUR_A_MAX + 1];
+	struct nlmsghdr *nlh = nlmsg_hdr(msg);
+	struct detour_request req;
+	struct nl_sock *nl_sk = arg;
+	int sk;
+	int rc = genlmsg_parse(nlh, 0, attrs, DETOUR_A_MAX, detour_genl_policy);
+	if (rc < 0) {
+		nl_perror(rc, "genlmsg_parse");
+		return NL_STOP;
+	}
+	if (!attrs[DETOUR_A_REMOTE_IP] || !attrs[DETOUR_A_REMOTE_PORT]) {
+		fprintf(stderr, "did not receive all necessary attributes\n");
+		return NL_STOP;
+	}
+	/*
+	 * TODO: For now we're setting detour_port to be the same as
+	 * server_port for simplicity. However, if we make multiple connections
+	 * to the same server_port, we will collide on the detour.
+	 */
+	req.server_ip = nla_get_u32(attrs[DETOUR_A_REMOTE_IP]);
+	req.server_port = nla_get_u16(attrs[DETOUR_A_REMOTE_PORT]);
+	req.detour_port = req.server_port;
+
+	if (send(detour_sk, &req, sizeof(req), 0) != sizeof(req)) {
+		perror("failed to send detour request");
+		return NL_STOP;
+	}
+
+	detour_add_or_del(nl_sk, &detour_addr.sin_addr, req.detour_port,
+	                  (struct in_addr*)&req.server_ip, req.server_port,
+	                  DETOUR_C_ADD);
+	return NL_STOP;
+}
+
+/* Call DETOUR_C_ECHO, either using CLI provided string or a default. */
+int cli_echo(struct nl_sock *sk, int argc, char *argv[])
+{
+	return detour_echo(sk);
 }
 
 /* Call DETOUR_C_ADD, using arguments from CLI. */
-int cli_add_or_del(struct nl_sock *sk, int family, int argc, char *argv[],
-                   uint8_t cmd)
+int cli_add_or_del(struct nl_sock *sk, int argc, char *argv[], uint8_t cmd)
 {
 	struct in_addr dip, rip;
 	uint16_t dpt, rpt;
@@ -155,11 +237,11 @@ int cli_add_or_del(struct nl_sock *sk, int family, int argc, char *argv[],
 		fprintf(stderr, "\"%s\" is not a valid port\n", argv[5]);
 		return -1;
 	}
-	return detour_add_or_del(sk, family, &dip, dpt, &rip, rpt, cmd);
+	return detour_add_or_del(sk, &dip, dpt, &rip, rpt, cmd);
 }
 
 /* Loop waiting for DETOUR_C_REQ messages from the kernel and print them. */
-int cli_req(struct nl_sock *sk, int group)
+int cli_req(struct nl_sock *sk)
 {
 	int rc, calls = 0;
 	rc = nl_socket_add_memberships(sk, group, NFNLGRP_NONE);
@@ -167,8 +249,8 @@ int cli_req(struct nl_sock *sk, int group)
 		nl_perror(rc, "nl_socket_add_memberships");
 		return rc;
 	}
-	rc = nl_socket_modify_cb(sk, NL_CB_MSG_IN, NL_CB_CUSTOM, detour_req_cb,
-				NULL);
+	rc = nl_socket_modify_cb(sk, NL_CB_MSG_IN, NL_CB_CUSTOM,
+	                         detour_req_echo_cb, NULL);
 	if (rc < 0) {
 		nl_perror(rc, "nl_cb_set");
 		return rc;
@@ -176,8 +258,59 @@ int cli_req(struct nl_sock *sk, int group)
 	nl_socket_disable_seq_check(sk);
 	do {
 		rc = nl_recvmsgs_default(sk);
-		fprintf(stderr, "nl_recvmsgs_default() ended\n");
 	} while (++calls < MAX_CALLS && rc >= 0);
+	if (rc < 0) {
+		nl_perror(rc, "nl_recvmsgs");
+	}
+	return rc;
+}
+
+/*
+ * Daemon-mode for cli. This is the "main point" of this client: wait for detour
+ * requests from the kernel, send them to our detour server, and inform the
+ * kernel of the newly available detours.
+ */
+int cli_daemon(struct nl_sock *sk, int argc, char *argv[])
+{
+	int rc;
+	/* get detour address and create socket */
+	if (argc < 3) {
+		fprintf(stderr, "expected detour ip address\n");
+		return EXIT_FAILURE;
+	}
+	detour_addr.sin_family = AF_INET;
+	if (!inet_aton(argv[2], &detour_addr.sin_addr)) {
+		fprintf(stderr, "invalid detour ip address\n");
+		return EXIT_FAILURE;
+	}
+	detour_addr.sin_port = DETOUR_DEFAULT_PORT;
+	detour_sk = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+	if (detour_sk == -1) {
+		perror("socket");
+		return EXIT_FAILURE;
+	}
+	if (connect(detour_sk, (struct sockaddr*)&detour_addr,
+	            sizeof(detour_addr)) == -1) {
+		perror("connect");
+		return EXIT_FAILURE;
+	}
+	/* Setup netlink callback and group membership for receiving */
+	rc = nl_socket_add_memberships(sk, group, NFNLGRP_NONE);
+	if (rc < 0) {
+		nl_perror(rc, "nl_socket_add_memberships");
+		return rc;
+	}
+	rc = nl_socket_modify_cb(sk, NL_CB_MSG_IN, NL_CB_CUSTOM,
+	                         detour_req_create_cb, sk);
+	if (rc < 0) {
+		nl_perror(rc, "nl_cb_set");
+		return rc;
+	}
+	nl_socket_disable_seq_check(sk);
+	/* now we loop receiving netlink messages */
+	do {
+		rc = nl_recvmsgs_default(sk);
+	} while (rc >= 0);
 	if (rc < 0) {
 		nl_perror(rc, "nl_recvmsgs");
 	}
@@ -189,7 +322,6 @@ int cli_req(struct nl_sock *sk, int group)
  */
 int main(int argc, char *argv[])
 {
-	int family, group;
 	struct nl_sock *sk;
 	int rc = EXIT_SUCCESS;
 
@@ -226,13 +358,13 @@ int main(int argc, char *argv[])
 	}
 
 	if (strcmp(argv[1], "echo") == 0) {
-		rc = cli_echo(sk, family, argc, argv);
+		rc = cli_echo(sk, argc, argv);
 	} else if (strcmp(argv[1], "add") == 0) {
-		rc = cli_add_or_del(sk, family, argc, argv, DETOUR_C_ADD);
+		rc = cli_add_or_del(sk, argc, argv, DETOUR_C_ADD);
 	} else if (strcmp(argv[1], "del") == 0) {
-		rc = cli_add_or_del(sk, family, argc, argv, DETOUR_C_DEL);
+		rc = cli_add_or_del(sk, argc, argv, DETOUR_C_DEL);
 	} else if (strcmp(argv[1], "req") == 0) {
-		rc = cli_req(sk, group);
+		rc = cli_req(sk);
 	} else {
 		fprintf(stderr, "\"%s\" is not a valid command\n", argv[1]);
 		rc = EXIT_FAILURE;
