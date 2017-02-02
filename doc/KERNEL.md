@@ -82,3 +82,28 @@ Comparisons of build time and kernel size for various configurations.
         sys	1m12.457s
 
 Thus we use the merged configuration based on allnoconfig.
+
+Configuration Oddities
+----------------------
+
+Since I start with the most basic configuration possible, and I add only what I
+need, sometimes I encounter errors that I need to address. Thus, there are quite
+a few odd configuration options I have enabled in the fragments within `etc`.
+
+For instance, I have `CONFIG_PROC_SYSCTL` set because MPTCP fails to initialize
+without it. I have `CONFIG_EPOLL` set because my `vido`-based test harness uses
+DHCPCD, and my version of DHCPCD requires epoll capabilities.
+
+The process for debugging this sort of thing is not too difficult, although it
+may seem daunting:
+
+1. You need some sort of stack trace, frequently from the kernel log or from the
+   output of the program that failed.
+2. Google will be of no use, because *nobody* encounters errors that occur when
+   you strip as many features out of your kernel as possible :)
+3. Go straight to the source of what failed, and find where the error message or
+   stack trace is produced. Likely you'll find a reference to some feature
+   subsystem of the kernel which has a configuration option.
+4. Grep through `.config` to find the (commented out) switch that you probably
+   ought to enable. Add it to a file in `etc/*.frag`, re-generate your
+   `.config`, and rebuild the kernel.
