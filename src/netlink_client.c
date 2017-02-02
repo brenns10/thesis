@@ -95,8 +95,9 @@ int detour_add_or_del(struct nl_sock *sk, int family, struct in_addr *dip,
 	NLA_PUT_U16(msg, DETOUR_A_REMOTE_PORT, rpt);
 
 	rc = nl_send_sync(sk, msg);
-	if (rc)
-		fprintf(stderr, "nl_send_sync failed: %d\n", rc);
+	if (rc) {
+		nl_perror(rc, "nl_send_sync");
+	}
 
 nla_put_failure:
 	return rc;
@@ -104,7 +105,6 @@ nla_put_failure:
 
 int detour_req_cb(struct nl_msg *msg, void *arg)
 {
-	static int calls = 0;
 	struct nlattr *attrs[DETOUR_A_MAX + 1];
 	struct nlmsghdr *nlh = nlmsg_hdr(msg);
 	struct in_addr rip;
@@ -121,13 +121,8 @@ int detour_req_cb(struct nl_msg *msg, void *arg)
 	rip.s_addr = nla_get_u32(attrs[DETOUR_A_REMOTE_IP]);
 	rpt = nla_get_u16(attrs[DETOUR_A_REMOTE_PORT]);
 	rpt = ntohs(rpt);
-	printf("DETOUR_C_REQ: %s:%u", inet_ntoa(rip), rpt);
-	if (++calls == MAX_CALLS) {
-		calls = 0;
-		return NL_STOP;
-	} else {
-		return 0;
-	}
+	printf("DETOUR_C_REQ: %s:%u\n", inet_ntoa(rip), rpt);
+	return NL_STOP;
 }
 
 /* Call DETOUR_C_ECHO, either using CLI provided string or a default. */
@@ -166,25 +161,27 @@ int cli_add_or_del(struct nl_sock *sk, int family, int argc, char *argv[],
 /* Loop waiting for DETOUR_C_REQ messages from the kernel and print them. */
 int cli_req(struct nl_sock *sk, int group)
 {
-	int rc;
-	struct nl_cb *cb;
+	int rc, calls = 0;
 	rc = nl_socket_add_memberships(sk, group, NFNLGRP_NONE);
 	if (rc < 0) {
-		fprintf(stderr, "nl_socket_add_memberships() failed (%d)\n",
-		        rc);
+		nl_perror(rc, "nl_socket_add_memberships");
 		return rc;
 	}
-	cb = nl_cb_alloc(NL_CB_CUSTOM);
-	if (!cb) {
-		fprintf(stderr, "nl_cb_alloc() failed\n");
-		return -1;
-	}
-	rc = nl_cb_set(cb, NL_CB_MSG_IN, NL_CB_CUSTOM, detour_req_cb, NULL);
+	rc = nl_socket_modify_cb(sk, NL_CB_MSG_IN, NL_CB_CUSTOM, detour_req_cb,
+				NULL);
 	if (rc < 0) {
-		fprintf(stderr, "nl_cb_set() failed (%d)\n", rc);
+		nl_perror(rc, "nl_cb_set");
 		return rc;
 	}
-	return nl_recvmsgs(sk, cb);
+	nl_socket_disable_seq_check(sk);
+	do {
+		rc = nl_recvmsgs_default(sk);
+		fprintf(stderr, "nl_recvmsgs_default() ended\n");
+	} while (++calls < MAX_CALLS && rc >= 0);
+	if (rc < 0) {
+		nl_perror(rc, "nl_recvmsgs");
+	}
+	return rc;
 }
 
 /*
@@ -203,27 +200,27 @@ int main(int argc, char *argv[])
 
 	sk = nl_socket_alloc();
 	if (!sk) {
-		fprintf(stderr, "nl_socket_alloc returned NULL\n");
+		nl_perror(rc, "nl_socket_alloc");
 		rc = EXIT_FAILURE;
 		goto exit;
 	}
 	rc = genl_connect(sk);
 	if (rc != 0) {
-		fprintf(stderr, "genl_connect failed: %d\n", rc);
+		nl_perror(rc, "genl_connect");
 		rc = EXIT_FAILURE;
 		goto exit;
 	}
 
 	family = genl_ctrl_resolve(sk, DETOUR_FAMILY);
 	if (family < 0) {
-		fprintf(stderr, "genl_ctrl_resolve failed: %d\n", family);
+		nl_perror(family, "genl_ctrl_resolve");
 		rc = EXIT_FAILURE;
 		goto exit;
 	}
 
 	group = genl_ctrl_resolve_grp(sk, DETOUR_FAMILY, DETOUR_GROUP);
 	if (group < 0) {
-		fprintf(stderr, "genl_ctrl_resolve_grp failed: %d\n", group);
+		nl_perror(group, "genl_ctrl_resolve_grp");
 		rc = EXIT_FAILURE;
 		goto exit;
 	}
