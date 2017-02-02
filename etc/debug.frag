@@ -1,6 +1,14 @@
 # This fragment contains debug features I need/want
 CONFIG_DEBUG_KERNEL=y
 CONFIG_DEBUG_INFO=y
+CONFIG_STACKTRACE=y
+CONFIG_DEBUG_LIST=y
+CONFIG_DEBUG_KMEMLEAK=y
+CONFIG_SLUB_DEBUG=y
+CONFIG_KMEMCHECK=y
+CONFIG_DEBUG_MUTEXES=y
+CONFIG_DEBUG_ATOMIC_SLEEP=y
+CONFIG_FRAME_POINTER=y
 
 # Also some things that I noticed were required but didn't have
 CONFIG_FUTEX=y
