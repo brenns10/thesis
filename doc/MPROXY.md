@@ -94,6 +94,13 @@ is not guaranteed that the ephemeral port created by the detour will match the
 ephemeral port chosen by the client. This is not a problem because port
 translation is a regular part of NAT, which MPTCP is designed to work through.
 
+Compatibility Considerations
+----------------------------
+
+Implementation should check the version field of all messages. If the version
+does not match the intended version of the implementation, a prominent message
+should be displayed on stderr.
+
 Reliability
 -----------
 
