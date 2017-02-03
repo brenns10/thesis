@@ -78,7 +78,7 @@ class MProxy(object):
         """Return True if we've already created a rule for this request."""
         return self.freeze(info) in self._entries
 
-    def handle_request(self, data, addr):
+    def handle_request(self, data, addr, sk):
         """Handle an incoming UDP request."""
         request = struct.unpack(REQUEST_FORMAT, data)
         info = {
@@ -89,9 +89,7 @@ class MProxy(object):
         }
         if not self.contains_entry(info):
             self.add_rules(info)
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.sendmsg(data, address=addr)  # echo back for confirmation
-        s.close()
+        sk.sendto(data, addr)  # echo back for confirmation
 
     def clean_up(self):
         """Delete all rules we have created."""
@@ -109,7 +107,7 @@ class MProxy(object):
             while True:
                 data, addr = s.recvfrom(msg_size)
                 assert(len(data) == msg_size)
-                self.handle_request(data, addr)
+                self.handle_request(data, addr, s)
         finally:
             # No matter what, we want to delete the IPTables rules we created.
             self.clean_up()
