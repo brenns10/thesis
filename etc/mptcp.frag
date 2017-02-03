@@ -17,3 +17,6 @@ CONFIG_PROC_SYSCTL=y
 CONFIG_EPOLL=y
 CONFIG_UNIX=y
 CONFIG_FILE_LOCKING=y
+
+# tun devices for using openvpn
+CONFIG_TUN=y
