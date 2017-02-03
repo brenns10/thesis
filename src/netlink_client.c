@@ -24,19 +24,34 @@
 #define MAX_CALLS 5
 
 /*
- * Format for UDP detour requests.
+ * Format for UDP mproxy requests.
  */
-struct detour_request {
-	uint32_t server_ip;
-	uint16_t server_port;
-	uint16_t detour_port;
+struct mproxy_request {
+	uint8_t ver;
+	uint8_t op;
+	uint8_t _reserved[2];
+	uint32_t rip;
+	uint16_t rpt;
+	uint16_t dpt;
 };
+
+/*
+ * MProxy protocol definitions.
+ */
+#define MPROXY_VERSION 1
+#define MPROXY_REQUEST 0
+#define MPROXY_RESPONSE 1
 
 /*
  * UDP socket to send requests to. Should be connect()-ed so all you need to do
  * is send(), not sendto().
  */
-int detour_sk;
+int mproxy_sk;
+
+/*
+ * address of mproxy daemon
+ */
+struct sockaddr_in mproxy_addr;
 
 /*
  * netlink family
@@ -49,14 +64,9 @@ int family;
 int group;
 
 /*
- * address of detour daemon
- */
-struct sockaddr_in detour_addr;
-
-/*
  * What port is the detour listening on? Should be this.
  */
-#define DETOUR_DEFAULT_PORT 45672
+#define MPROXY_DEFAULT_PORT htons(45672)
 
 /*
  * The following are shamelessly taken from the kernel code.
@@ -176,7 +186,7 @@ int detour_req_create_cb(struct nl_msg *msg, void *arg)
 {
 	struct nlattr *attrs[DETOUR_A_MAX + 1];
 	struct nlmsghdr *nlh = nlmsg_hdr(msg);
-	struct detour_request req;
+	struct mproxy_request req, rsp;
 	struct nl_sock *nl_sk = arg;
 	int sk;
 	int rc = genlmsg_parse(nlh, 0, attrs, DETOUR_A_MAX, detour_genl_policy);
@@ -188,22 +198,26 @@ int detour_req_create_cb(struct nl_msg *msg, void *arg)
 		fprintf(stderr, "did not receive all necessary attributes\n");
 		return NL_STOP;
 	}
-	/*
-	 * TODO: For now we're setting detour_port to be the same as
-	 * server_port for simplicity. However, if we make multiple connections
-	 * to the same server_port, we will collide on the detour.
-	 */
-	req.server_ip = nla_get_u32(attrs[DETOUR_A_REMOTE_IP]);
-	req.server_port = nla_get_u16(attrs[DETOUR_A_REMOTE_PORT]);
-	req.detour_port = req.server_port;
+	req.ver = MPROXY_VERSION;
+	req.op = MPROXY_REQUEST;
+	req._reserved[0] = 0;
+	req._reserved[1] = 0;
+	req.rip = nla_get_u32(attrs[DETOUR_A_REMOTE_IP]);
+	req.rpt = nla_get_u16(attrs[DETOUR_A_REMOTE_PORT]);
+	req.dpt = req.rpt;
 
-	if (send(detour_sk, &req, sizeof(req), 0) != sizeof(req)) {
-		perror("failed to send detour request");
+	if (send(mproxy_sk, &req, sizeof(req), 0) != sizeof(req)) {
+		perror("failed to send mproxy request");
 		return NL_STOP;
 	}
 
-	detour_add_or_del(nl_sk, &detour_addr.sin_addr, req.detour_port,
-	                  (struct in_addr*)&req.server_ip, req.server_port,
+	if (recv(mproxy_sk, &req, sizeof(req), 0) != sizeof(req)) {
+		perror("failed to recv mproxy resopnse");
+		return NL_STOP;
+	}
+
+	detour_add_or_del(nl_sk, &mproxy_addr.sin_addr, req.dpt,
+	                  (struct in_addr*)&req.rip, req.rpt,
 	                  DETOUR_C_ADD);
 	return NL_STOP;
 }
@@ -278,19 +292,19 @@ int cli_daemon(struct nl_sock *sk, int argc, char *argv[])
 		fprintf(stderr, "expected detour ip address\n");
 		return EXIT_FAILURE;
 	}
-	detour_addr.sin_family = AF_INET;
-	if (!inet_aton(argv[2], &detour_addr.sin_addr)) {
+	mproxy_addr.sin_family = AF_INET;
+	if (!inet_aton(argv[2], &mproxy_addr.sin_addr)) {
 		fprintf(stderr, "invalid detour ip address\n");
 		return EXIT_FAILURE;
 	}
-	detour_addr.sin_port = DETOUR_DEFAULT_PORT;
-	detour_sk = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-	if (detour_sk == -1) {
+	mproxy_addr.sin_port = MPROXY_DEFAULT_PORT;
+	mproxy_sk = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+	if (mproxy_sk == -1) {
 		perror("socket");
 		return EXIT_FAILURE;
 	}
-	if (connect(detour_sk, (struct sockaddr*)&detour_addr,
-	            sizeof(detour_addr)) == -1) {
+	if (connect(mproxy_sk, (struct sockaddr*)&mproxy_addr,
+	            sizeof(mproxy_addr)) == -1) {
 		perror("connect");
 		return EXIT_FAILURE;
 	}
