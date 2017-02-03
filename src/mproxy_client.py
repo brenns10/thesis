@@ -23,7 +23,9 @@ def main():
     data = struct.pack(REQUEST_FORMAT, *request)
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     s.sendto(data, (daemon_ip, 45672))
-
+    msg, addr = s.recvmsg(len(data))
+    print('received response')
+    print(msg == data)
 
 if __name__ == '__main__':
     main()

@@ -89,6 +89,9 @@ class MProxy(object):
         }
         if not self.contains_entry(info):
             self.add_rules(info)
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.sendmsg(data, address=addr)  # echo back for confirmation
+        s.close()
 
     def clean_up(self):
         """Delete all rules we have created."""
