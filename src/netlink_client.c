@@ -251,7 +251,7 @@ int cli_add_or_del(struct nl_sock *sk, int argc, char *argv[], uint8_t cmd)
 		fprintf(stderr, "\"%s\" is not a valid port\n", argv[5]);
 		return -1;
 	}
-	return detour_add_or_del(sk, &dip, dpt, &rip, rpt, cmd);
+	return detour_add_or_del(sk, &dip, htons(dpt), &rip, htons(rpt), cmd);
 }
 
 /* Loop waiting for DETOUR_C_REQ messages from the kernel and print them. */
@@ -379,6 +379,8 @@ int main(int argc, char *argv[])
 		rc = cli_add_or_del(sk, argc, argv, DETOUR_C_DEL);
 	} else if (strcmp(argv[1], "req") == 0) {
 		rc = cli_req(sk);
+	} else if (strcmp(argv[1], "daemon") == 0) {
+		rc = cli_daemon(sk, argc, argv);
 	} else {
 		fprintf(stderr, "\"%s\" is not a valid command\n", argv[1]);
 		rc = EXIT_FAILURE;
