@@ -20,6 +20,8 @@ Code Documentation
   (Documentation of MProxy protocol for client-detour communication)
 - [NETLINK.md](NETLINK.md)
   (Documentation of Generic Netlink protocol for user-kernel communication)
+- [SOCKETS.md](SOCKETS.md)
+  (Description of the different types of sockets used)
 
 Misc
 ----
