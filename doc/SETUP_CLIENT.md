@@ -123,6 +123,12 @@ is marked up:
 sudo ip link set up dev bridge0
 ```
 
+Finally, the big thing is that I needed to completely **disable my firewall**.
+For some very odd reason, it seems like packets that are going through a bridge
+still go through iptables. Realistically, you could probably set some iptables
+rules that guarantee that bridge packets go through, but it was easier to just
+disable the firewall, and I'm in a safe network anyway.
+
 Running
 -------
 
