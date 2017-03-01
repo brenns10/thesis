@@ -15,6 +15,8 @@ import socket
 import struct
 import random
 
+import psutil
+
 # See doc/TERMS.md for definitions of variable names.
 SNAT_COMMAND = (
     'iptables -t nat -A POSTROUTING -s {cip} -d {rip} -p tcp '
@@ -61,6 +63,23 @@ def myip():
     addr = s.getsockname()[0]
     s.close()
     return addr
+
+
+def is_port_open(n):
+    """
+    Return True if there is a TCP server listening on that port.
+
+    This only considers non-loopback servers (i.e. remote address is not
+    127.0.0.1 or ::1).
+    """
+    connections = psutil.net_connections('tcp')
+    for conn in connections:
+        if conn.laddr[0] == '127.0.0.1' or conn.laddr[0] == '::1':
+            # ignore loopback
+            continue
+        if conn.laddr[1] == n and conn.status == psutil.CONN_LISTEN:
+            return True
+    return False
 
 
 Request = namedtuple('Request', ['rip', 'rpt', 'dpt', 'cip'])
@@ -114,13 +133,13 @@ class MProxy(object):
 
     def dpt_restricted(self, i):
         """Returns truthy if the dpt is restricted."""
-        return i.dpt in (2222,)
+        return is_port_open(i.dpt)
 
     def pick_new_dpt(self, i):
         """Picks a dpt unused by the client so far."""
         # choose a new one first, in case dpt = 0, or something
         i = i._replace(dpt=random.randint(MIN_EPHEM, MAX_EPHEM))
-        while self.dpt_used_by_client(i):
+        while self.dpt_used_by_client(i) and not self.dpt_restricted(i.dpt):
             i = i._replace(dpt=random.randint(MIN_EPHEM, MAX_EPHEM))
         return i
 
