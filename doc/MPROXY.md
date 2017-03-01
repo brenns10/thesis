@@ -17,8 +17,8 @@ negotiate these rules.
 
 This document describes the MProxy Protocol version 1, which is currently in an
 experimental, unstable state. A Python reference implementation of the detour
-end of the protocol can be found in `src/mproxy.py`, and two implementations are
-included of a client (`src/mproxy_client.py` and `src/netlink_client.c`).
+end of the protocol can be found in `src/detour.py`, and two implementations are
+included of a client (`src/request.py` and `src/client.c`).
 
 Protocol
 --------
