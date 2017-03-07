@@ -1,4 +1,4 @@
-/*
+/**
  * Runs on the client and sends messages to the detour kernel module.
  * build: make netlink_client
  * run: ./netlink_client CMD [ARGS ...]
@@ -18,12 +18,12 @@
 #include <netlink/genl/genl.h>
 #include <netlink/genl/ctrl.h>
 
-/*
+/**
  * How many calls should the DETOUR_C_REQ echo handler listen to before quit?
  */
 #define MAX_CALLS 5
 
-/*
+/**
  * Format for UDP mproxy requests.
  */
 struct mproxy_request {
@@ -35,40 +35,40 @@ struct mproxy_request {
 	uint16_t dpt;
 };
 
-/*
+/**
  * MProxy protocol definitions.
  */
 #define MPROXY_VERSION 1
 #define MPROXY_REQUEST 0
 #define MPROXY_RESPONSE 1
 
-/*
+/**
  * UDP socket to send requests to. Should be connect()-ed so all you need to do
  * is send(), not sendto().
  */
 int mproxy_sk;
 
-/*
+/**
  * address of mproxy daemon
  */
 struct sockaddr_in mproxy_addr;
 
-/*
+/**
  * netlink family
  */
 int family;
 
-/*
+/**
  * netlink group
  */
 int group;
 
-/*
+/**
  * What port is the detour listening on? Should be this.
  */
 #define MPROXY_DEFAULT_PORT htons(45672)
 
-/*
+/**
  * The following are shamelessly taken from the kernel code.
  */
 #define DETOUR_FAMILY "DETOUR"
@@ -99,6 +99,12 @@ static struct nla_policy detour_genl_policy[DETOUR_A_MAX + 1] = {
 };
 
 
+/**
+ * Call the DETUOR_C_ECHO function in the kernel. The function itself takes no
+ * arguments, but we do need a socket to send on.
+ * @param sk A socket, which has already been initialized and connected
+ * @retval zero on success, nonzero on failure
+ */
 int detour_echo(struct nl_sock *sk)
 {
 	int rc = -1;
@@ -122,6 +128,11 @@ nla_put_failure: // needed by NLA_PUT_X macros
 	return rc;
 }
 
+/**
+ * Call the DETOUR_C_ADD or DETOUR_C_DEL command with a NAT-based detour. This
+ * means you'll need to specify detour and remote IP and port. You'll also need
+ * to specify one of the two commands.
+ */
 int detour_add_or_del(struct nl_sock *sk, struct in_addr *dip,
                       uint16_t dpt, struct in_addr *rip, uint16_t rpt,
                       int command) {
@@ -152,12 +163,13 @@ nla_put_failure:
 	return rc;
 }
 
-/*
+/**
  * Callback function for DETOUR_C_REQ messages. Parses the message and then
  * echoes it to stdout.
  */
 int detour_req_echo_cb(struct nl_msg *msg, void *arg)
 {
+	(void)arg;
 	struct nlattr *attrs[DETOUR_A_MAX + 1];
 	struct nlmsghdr *nlh = nlmsg_hdr(msg);
 	struct in_addr rip;
@@ -178,7 +190,7 @@ int detour_req_echo_cb(struct nl_msg *msg, void *arg)
 	return NL_STOP;
 }
 
-/*
+/**
  * Callback function for DETOUR_C_REQ messages. Parses the message, requests a
  * detour via UDP, and then informs the kernel of the new detour.
  */
@@ -222,13 +234,13 @@ int detour_req_create_cb(struct nl_msg *msg, void *arg)
 	return NL_STOP;
 }
 
-/* Call DETOUR_C_ECHO, either using CLI provided string or a default. */
+/** Call DETOUR_C_ECHO, either using CLI provided string or a default. */
 int cli_echo(struct nl_sock *sk, int argc, char *argv[])
 {
 	return detour_echo(sk);
 }
 
-/* Call DETOUR_C_ADD, using arguments from CLI. */
+/** Call DETOUR_C_ADD, using arguments from CLI. */
 int cli_add_or_del(struct nl_sock *sk, int argc, char *argv[], uint8_t cmd)
 {
 	struct in_addr dip, rip;
@@ -254,7 +266,7 @@ int cli_add_or_del(struct nl_sock *sk, int argc, char *argv[], uint8_t cmd)
 	return detour_add_or_del(sk, &dip, htons(dpt), &rip, htons(rpt), cmd);
 }
 
-/* Loop waiting for DETOUR_C_REQ messages from the kernel and print them. */
+/** Loop waiting for DETOUR_C_REQ messages from the kernel and print them. */
 int cli_req(struct nl_sock *sk)
 {
 	int rc, calls = 0;
@@ -279,7 +291,7 @@ int cli_req(struct nl_sock *sk)
 	return rc;
 }
 
-/*
+/**
  * Daemon-mode for cli. This is the "main point" of this client: wait for detour
  * requests from the kernel, send them to our detour server, and inform the
  * kernel of the newly available detours.
@@ -331,8 +343,8 @@ int cli_daemon(struct nl_sock *sk, int argc, char *argv[])
 	return rc;
 }
 
-/*
- * uses libnl to send an empty message to the given family or command.
+/**
+ * Parses first argument and invokes the correct cli_ function.
  */
 int main(int argc, char *argv[])
 {
