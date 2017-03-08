@@ -385,7 +385,7 @@ int detour_req_create_cb(struct nl_msg *msg, void *arg)
 	req.rip = nla_get_u32(attrs[DETOUR_A_REMOTE_IP]);
 	req.rpt = nla_get_u16(attrs[DETOUR_A_REMOTE_PORT]);
 	req.dpt = req.rpt;
-	pr_info(dc, "received request: %s:%u",
+	pr_info(dc, "received request: %s:%u\n",
 	        inet_ntoa(IN_ADDR(req.rip)), req.rpt);
 
 	if (send_requests(dc, &req)) {
