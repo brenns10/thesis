@@ -1,16 +1,19 @@
 /**
  * Runs on the client and sends messages to the detour kernel module.
- * build: make netlink_client
- * run: ./netlink_client CMD [ARGS ...]
+ * build: make client
+ * run: ./client CMD [ARGS ...]
  */
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <stdbool.h>
 
+#include <unistd.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <regex.h>
 
 #include <netlink/netlink.h>
 #include <netlink/attr.h>
@@ -19,9 +22,42 @@
 #include <netlink/genl/ctrl.h>
 
 /**
+ * Helper function to perror() and then abort()
+ */
+void abort_perror(char *msg)
+{
+	perror(msg);
+	abort();
+}
+
+/**
  * How many calls should the DETOUR_C_REQ echo handler listen to before quit?
  */
 #define MAX_CALLS 5
+
+/**
+ * Copied from the kernel; max length of interface name.
+ */
+#define IFNAMSIZ 16
+
+/**
+ * Macro for getting the size of a static array.
+ */
+#define nelem(arr) (sizeof(arr) / sizeof(arr[0]))
+
+/**
+ * A struct for tracking running VPN processes.
+ * @next: linked list
+ * @openvpn_pid: process ID of the openvpn process
+ * @fildes: fildes[1] is stdout of openvpn, read fildes[0] to get output
+ * @ifname: interface name associated with it
+ */
+struct vpn_manager {
+	struct vpn_manager *next;
+	pid_t openvpn_pid; /* only valid in the parent, obviously */
+	int fildes[2];
+	char ifname[IFNAMSIZ];
+};
 
 /**
  * Format for UDP mproxy requests.
@@ -198,9 +234,8 @@ int detour_req_create_cb(struct nl_msg *msg, void *arg)
 {
 	struct nlattr *attrs[DETOUR_A_MAX + 1];
 	struct nlmsghdr *nlh = nlmsg_hdr(msg);
-	struct mproxy_request req, rsp;
+	struct mproxy_request req;
 	struct nl_sock *nl_sk = arg;
-	int sk;
 	int rc = genlmsg_parse(nlh, 0, attrs, DETOUR_A_MAX, detour_genl_policy);
 	if (rc < 0) {
 		nl_perror(rc, "genlmsg_parse");
@@ -232,6 +267,109 @@ int detour_req_create_cb(struct nl_msg *msg, void *arg)
 	                  (struct in_addr*)&req.rip, req.rpt,
 	                  DETOUR_C_ADD);
 	return NL_STOP;
+}
+
+/**
+ * Wait for OpenVPN to initialize itself. We do this by reading lines from its
+ * stdout and matching them against regular expressions for particular outputs
+ * we need. Once we have seen "Initialization Sequence Completed", we know that
+ * we have a happily completed tunnel, and we can return.
+ * @param mgr Where we get file descriptors from, and where we'll write ifname
+ */
+void wait_for_openvpn(struct vpn_manager *mgr)
+{
+	char buf[512];
+	char *if_str = "TUN/TAP device ([[:alnum:]]+) opened";
+	char *comp_str = "Initialization Sequence Completed";
+	regex_t if_re, comp_re;
+	FILE *openvpn;
+	regmatch_t matches[2];
+
+	openvpn = fdopen(mgr->fildes[0], "r");
+	if (!openvpn)
+		abort_perror("fdopen");
+	if (regcomp(&if_re, if_str, REG_EXTENDED))
+		abort_perror("in regcomp(if_str)");
+	if (regcomp(&comp_re, comp_str, REG_EXTENDED))
+		abort_perror("in regcomp(comp_str)");
+
+	printf("waiting for device name...\n");
+	while (true) {
+		if (!fgets(buf, sizeof(buf), openvpn))
+			abort_perror("fgets1");
+		if (!regexec(&if_re, buf, nelem(matches), matches, 0)) {
+			int len = matches[1].rm_eo - matches[1].rm_so;
+			len = len < IFNAMSIZ-1 ? len : (IFNAMSIZ-1);
+			strncpy(mgr->ifname, buf + matches[1].rm_so, len);
+			mgr->ifname[len] = '\0';
+			break;
+		}
+	}
+
+	printf("waiting for initialization sequence...\n");
+	while (true) {
+		if (!fgets(buf, sizeof(buf), openvpn))
+			abort_perror("fgets2");
+		if (!regexec(&comp_re, buf, nelem(matches), matches, 0)) {
+			break;
+		}
+	}
+}
+
+/**
+ * Fork and launch OpenVPN in client mode. Returns in the parent, not the child.
+ * @param addr Address of the remote server
+ * @returns A pointer to the filled out struct vpn_manager
+ */
+struct vpn_manager *detour_launch_openvpn(char *addr)
+{
+	pid_t pid;
+	struct vpn_manager *mgr;
+	char *openvpn_args[] = {
+		"openvpn",
+		"--remote", NULL, /* only add/modify args below this one! */
+		"--client",
+		"--dev", "tun",
+		"--ca", "ca.crt",
+		"--cert", "client1.crt",
+		"--key", "client1.key",
+		"--topology", "p2p",
+		"--pull",
+		"--nobind",
+		NULL, /* this must be the last one */
+	};
+	openvpn_args[2] = addr;
+
+	mgr = malloc(sizeof(struct vpn_manager));
+	mgr->next = NULL;
+	if (pipe(mgr->fildes) == -1) {
+		perror("error in pipe()");
+		return NULL;
+	}
+
+	pid = fork();
+	if (pid == -1) {
+		/* error */
+		perror("error forking");
+		return NULL;
+	} else if (pid == 0) {
+		/* child */
+		if (dup2(mgr->fildes[1], STDOUT_FILENO) == -1) {
+			perror("dup2 failed in child");
+			exit(EXIT_FAILURE);
+		}
+		if (execvp("openvpn", openvpn_args) == -1) {
+			perror("execvp failed in child");
+			exit(EXIT_FAILURE);
+		}
+		/* because i'm paranoid */
+		exit(EXIT_SUCCESS);
+	} else {
+		/* parent */
+		mgr->openvpn_pid = pid;
+		wait_for_openvpn(mgr);
+		return mgr;
+	}
 }
 
 /** Call DETOUR_C_ECHO, either using CLI provided string or a default. */
@@ -343,6 +481,20 @@ int cli_daemon(struct nl_sock *sk, int argc, char *argv[])
 	return rc;
 }
 
+/** Run two vpn connections and report their ifnames, for diagnostics. */
+int cli_vpn(struct nl_sock *sk, int argc, char *argv[])
+{
+	(void)sk;
+	if (argc != 3) {
+		fprintf(stderr, "need an address");
+		return -1;
+	}
+	struct vpn_manager *vpn1 = detour_launch_openvpn(argv[2]);
+	struct vpn_manager *vpn2 = detour_launch_openvpn(argv[2]);
+	printf("vpn1: %s, vpn2: %s\n", vpn1->ifname, vpn2->ifname);
+	return 0;
+}
+
 /**
  * Parses first argument and invokes the correct cli_ function.
  */
@@ -393,6 +545,8 @@ int main(int argc, char *argv[])
 		rc = cli_req(sk);
 	} else if (strcmp(argv[1], "daemon") == 0) {
 		rc = cli_daemon(sk, argc, argv);
+	} else if (strcmp(argv[1], "vpn") == 0) {
+		rc = cli_vpn(sk, argc, argv);
 	} else {
 		fprintf(stderr, "\"%s\" is not a valid command\n", argv[1]);
 		rc = EXIT_FAILURE;
