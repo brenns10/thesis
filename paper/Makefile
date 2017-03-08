@@ -15,7 +15,7 @@ clean:
 	rm -f $(patsubst %.pdf,%.log,$(PARTS))
 
 paper.tex: _header.tex paper_body.tex $(FRAGS)
-	cat header.tex paper_body.tex > paper.tex
+	cat _header.tex paper_body.tex > paper.tex
 
 %.pdf: %.tex
 	latexmk -pdf -pdflatex="pdflatex -interaction=nonstopmode" -use-make $<
