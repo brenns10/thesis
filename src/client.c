@@ -139,6 +139,7 @@ enum {
 	DETOUR_A_DETOUR_PORT,
 	DETOUR_A_REMOTE_IP,
 	DETOUR_A_REMOTE_PORT,
+	DETOUR_A_IFNAME,
 	__DETOUR_A_MAX,
 };
 #define DETOUR_A_MAX (__DETOUR_A_MAX - 1)
@@ -147,6 +148,7 @@ static struct nla_policy detour_genl_policy[DETOUR_A_MAX + 1] = {
 	[DETOUR_A_DETOUR_PORT] = { .type = NLA_U16 },
 	[DETOUR_A_REMOTE_IP] = { .type = NLA_U32 },
 	[DETOUR_A_REMOTE_PORT] = { .type = NLA_U16 },
+	[DETOUR_A_IFNAME] = { .type = NLA_STRING, .maxlen = IFNAMSIZ },
 };
 
 
@@ -215,6 +217,33 @@ nla_put_failure:
 }
 
 /**
+ * Call the DETOUR_C_ADD or DETOUR_C_DEL command with a VPN-based detour.
+ */
+int detour_add_or_del_if(struct nl_sock *sk, char *ifname, int command)
+{
+	int rc = -1;
+	struct nl_msg *msg = nlmsg_alloc();
+
+	if (!msg) {
+		fprintf(stderr, "nlmsg_alloc failed\n");
+		goto nla_put_failure;
+	}
+	if (!genlmsg_put(msg, NL_AUTO_PORT, NL_AUTO_SEQ, family, 0, 0,
+	                 command, DETOUR_VERSION)) {
+		fprintf(stderr, "failed to put genl header\n");
+		goto nla_put_failure;
+	}
+	NLA_PUT_STRING(msg, DETOUR_A_IFNAME, ifname);
+	rc = nl_send_sync(sk, msg);
+	if (rc) {
+		nl_perror(rc, "nl_send_sync");
+	}
+
+nla_put_failure:
+	return rc;
+}
+
+/**
  * Callback function for DETOUR_C_REQ messages. Parses the message and then
  * echoes it to stdout.
  */
@@ -252,6 +281,7 @@ int send_requests(struct daemon_config *dc, struct mproxy_request *req)
 			perror("failed to send mproxy request");
 			return -1;
 		}
+		mgr = mgr->next;
 	}
 	return 0;
 }
@@ -273,6 +303,7 @@ int recv_responses(struct daemon_config *dc)
 		detour_add_or_del(dc->sk, &mgr->addr.sin_addr, req.dpt,
 		                  (struct in_addr*)&req.rip, req.rpt,
 		                  DETOUR_C_ADD);
+		mgr = mgr->next;
 	}
 	return 0;
 }
@@ -626,6 +657,23 @@ destroy:
 }
 
 /**
+ * Send all vpns in the daemon_config to the kernel.
+ */
+int report_vpns(struct daemon_config *dc)
+{
+	struct vpn_manager *mgr = dc->vpns;
+	int rc = 0;
+	while (mgr) {
+		rc = detour_add_or_del_if(dc->sk, mgr->ifname, DETOUR_C_ADD);
+		if (rc) {
+			return rc;
+		}
+		mgr = mgr->next;
+	}
+	return rc;
+}
+
+/**
  * Daemon-mode for cli. This is the "main point" of this client: wait for detour
  * requests from the kernel, send them to our detour server, and inform the
  * kernel of the newly available detours.
@@ -657,6 +705,9 @@ int cli_daemon(struct nl_sock *sk, int argc, char *argv[])
 		goto destroy_dc;
 	}
 	nl_socket_disable_seq_check(sk);
+	if (report_vpns(dc)) {
+		goto destroy_dc;
+	}
 	/* now we loop receiving netlink messages */
 	do {
 		rc = nl_recvmsgs_default(sk);
@@ -677,9 +728,14 @@ int cli_vpn(struct nl_sock *sk, int argc, char *argv[])
 		fprintf(stderr, "need an address");
 		return -1;
 	}
-	struct vpn_manager *vpn1 = detour_launch_openvpn(argv[2]);
-	struct vpn_manager *vpn2 = detour_launch_openvpn(argv[2]);
-	printf("vpn1: %s, vpn2: %s\n", vpn1->ifname, vpn2->ifname);
+	struct daemon_config cfg;
+	cfg.vpns = detour_launch_openvpn(argv[2]);
+	cfg.vpns->next = NULL;
+	cfg.sk = sk;
+	printf("vpn: %s\n", cfg.vpns->ifname);
+	printf("reporting...\n");
+	report_vpns(&cfg);
+	printf("done.\n");
 	return 0;
 }
 
