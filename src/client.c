@@ -2,12 +2,18 @@
  * Runs on the client and sends messages to the detour kernel module.
  * build: make client
  * run: ./client CMD [ARGS ...]
+ *
+ * TODO: if scalability is required/desired, we need threading
+ * TODO: logging
+ * TODO: daemonize
  */
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <stdarg.h>
+#include <errno.h>
 
 #include <unistd.h>
 #include <signal.h>
@@ -44,9 +50,41 @@ void abort_perror(char *msg)
 #define IFNAMSIZ 16
 
 /**
+ * convert uint32_t to struct in_addr
+ */
+#define IN_ADDR(x) (struct in_addr){x}
+
+/**
  * Macro for getting the size of a static array.
  */
 #define nelem(arr) (sizeof(arr) / sizeof(arr[0]))
+
+/**
+ * Log levels - messages with level <= the set level are logged. Note similarity
+ * kernel log levels.
+ */
+enum {
+	LEVEL_EMERG = 0,
+	LEVEL_ALERT,
+	LEVEL_CRIT,
+	LEVEL_ERR,
+	LEVEL_WARNING,
+	LEVEL_NOTICE,
+	LEVEL_INFO,
+	LEVEL_DEBUG,
+	LEVEL_DEFAULT,
+};
+char *levels[] = {
+	"EMERG",
+	"ALERT",
+	"CRIT",
+	"ERR",
+	"WARNING",
+	"NOTICE",
+	"INFO",
+	"DEBUG",
+	"DEFAULT",
+};
 
 /**
  * A struct for tracking running VPN processes.
@@ -88,7 +126,39 @@ struct daemon_config {
 	struct vpn_manager *vpns;
 	struct detour_manager *detours;
 	struct nl_sock *sk;
+	FILE *logfile;
+	int daemonize;
+	int loglevel;
 };
+
+void _dc_log(struct daemon_config *dc, int level, const char *format, ...)
+{
+	va_list va;
+
+	if (level > dc->loglevel)
+		return;
+
+	va_start(va, format);
+	vfprintf(dc->logfile, format, va);
+	va_end(va);
+	fflush(dc->logfile); // yolo
+}
+
+#define dc_log(dc,level,format, ...) \
+	_dc_log(dc, level, "%s:%d:[%s] " format, __FILE__, __LINE__, \
+	        levels[level], ##__VA_ARGS__)
+#define pr_emerg(dc, format, ...) dc_log(dc, LEVEL_EMERG, format, ##__VA_ARGS__)
+#define pr_alert(dc, format, ...) dc_log(dc, LEVEL_ALERT, format, ##__VA_ARGS__)
+#define pr_crit(dc, format, ...) dc_log(dc, LEVEL_CRIT, format, ##__VA_ARGS__)
+#define pr_err(dc, format, ...) dc_log(dc, LEVEL_ERR, format, ##__VA_ARGS__)
+#define pr_warning(dc, format, ...) dc_log(dc, LEVEL_WARNING, format, ##__VA_ARGS__)
+#define pr_notice(dc, format, ...) dc_log(dc, LEVEL_NOTICE, format, ##__VA_ARGS__)
+#define pr_info(dc, format, ...) dc_log(dc, LEVEL_INFO, format, ##__VA_ARGS__)
+#define pr_debug(dc, format, ...) dc_log(dc, LEVEL_DEBUG, format, ##__VA_ARGS__)
+#define pr_default(dc, format, ...) dc_log(dc, LEVEL_DEFAULT, format, ##__VA_ARGS__)
+
+// replaces perror for logging
+#define pr_perror(dc, message) pr_err(dc, "%s: %s", message, strerror(errno))
 
 /**
  * Format for UDP mproxy requests.
@@ -298,13 +368,14 @@ int detour_req_create_cb(struct nl_msg *msg, void *arg)
 	struct nlattr *attrs[DETOUR_A_MAX + 1];
 	struct nlmsghdr *nlh = nlmsg_hdr(msg);
 	struct mproxy_request req;
+	pr_debug(dc, "in detour_req_create_cb()\n");
 	int rc = genlmsg_parse(nlh, 0, attrs, DETOUR_A_MAX, detour_genl_policy);
 	if (rc < 0) {
 		nl_perror(rc, "genlmsg_parse");
 		return NL_STOP;
 	}
 	if (!attrs[DETOUR_A_REMOTE_IP] || !attrs[DETOUR_A_REMOTE_PORT]) {
-		fprintf(stderr, "did not receive all necessary attributes\n");
+		pr_err(dc, "did not receive all necessary attributes\n");
 		return NL_STOP;
 	}
 	req.ver = MPROXY_VERSION;
@@ -314,6 +385,8 @@ int detour_req_create_cb(struct nl_msg *msg, void *arg)
 	req.rip = nla_get_u32(attrs[DETOUR_A_REMOTE_IP]);
 	req.rpt = nla_get_u16(attrs[DETOUR_A_REMOTE_PORT]);
 	req.dpt = req.rpt;
+	pr_info(dc, "received request: %s:%u",
+	        inet_ntoa(IN_ADDR(req.rip)), req.rpt);
 
 	if (send_requests(dc, &req)) {
 		return NL_STOP;
@@ -330,15 +403,17 @@ int detour_req_create_cb(struct nl_msg *msg, void *arg)
 // Daemon Management Functions
 ////////////////////////////////////////////////////////////////////////////////
 
+
 /**
  * Send a mproxy detour request to each UDP socket in the daemon.
  */
 int send_requests(struct daemon_config *dc, struct mproxy_request *req)
 {
 	struct detour_manager *mgr = dc->detours;
+	pr_info(dc, "sending mproxy requests\n");
 	while (mgr) {
 		if (send(mgr->sk, req, sizeof(*req), 0) != sizeof(*req)) {
-			perror("failed to send mproxy request");
+			pr_perror(dc, "failed to send mproxy request");
 			return -1;
 		}
 		mgr = mgr->next;
@@ -355,14 +430,17 @@ int recv_responses(struct daemon_config *dc)
 {
 	struct detour_manager *mgr = dc->detours;
 	struct mproxy_request req;
+	pr_info(dc, "waiting for mproxy responses\n");
 	while (mgr) {
 		if (recv(mgr->sk, &req, sizeof(req), 0) != sizeof(req)) {
 			perror("failed to recv mproxy response");
 			return -1;
 		}
+		pr_debug(dc, "received response, sending to kernel\n");
 		detour_add_or_del(dc->sk, &mgr->addr.sin_addr, req.dpt,
 		                  (struct in_addr*)&req.rip, req.rpt,
 		                  DETOUR_C_ADD);
+		pr_debug(dc, "sent.\n");
 		mgr = mgr->next;
 	}
 	return 0;
@@ -374,9 +452,10 @@ int recv_responses(struct daemon_config *dc)
  * stdout and matching them against regular expressions for particular outputs
  * we need. Once we have seen "Initialization Sequence Completed", we know that
  * we have a happily completed tunnel, and we can return.
+ * @param dc daemon config, for logging
  * @param mgr Where we get file descriptors from, and where we'll write ifname
  */
-void wait_for_openvpn(struct vpn_manager *mgr)
+void wait_for_openvpn(struct daemon_config *dc, struct vpn_manager *mgr)
 {
 	char buf[512];
 	char *if_str = "TUN/TAP device ([[:alnum:]]+) opened";
@@ -393,7 +472,7 @@ void wait_for_openvpn(struct vpn_manager *mgr)
 	if (regcomp(&comp_re, comp_str, REG_EXTENDED))
 		abort_perror("in regcomp(comp_str)");
 
-	printf("waiting for device name...\n");
+	if (dc) pr_info(dc, "waiting for device name...\n");
 	while (true) {
 		if (!fgets(buf, sizeof(buf), openvpn))
 			abort_perror("fgets1");
@@ -406,7 +485,7 @@ void wait_for_openvpn(struct vpn_manager *mgr)
 		}
 	}
 
-	printf("waiting for initialization sequence...\n");
+	if (dc) pr_info(dc, "waiting for initialization sequence...\n");
 	while (true) {
 		if (!fgets(buf, sizeof(buf), openvpn))
 			abort_perror("fgets2");
@@ -422,7 +501,8 @@ void wait_for_openvpn(struct vpn_manager *mgr)
  * @param addr Address of the remote server
  * @returns A pointer to the filled out struct vpn_manager
  */
-struct vpn_manager *detour_launch_openvpn(const char *addr)
+struct vpn_manager *detour_launch_openvpn(struct daemon_config *dc,
+                                          const char *addr)
 {
 	pid_t pid;
 	struct vpn_manager *mgr;
@@ -444,7 +524,7 @@ struct vpn_manager *detour_launch_openvpn(const char *addr)
 	mgr = malloc(sizeof(struct vpn_manager));
 	mgr->next = NULL;
 	if (pipe(mgr->fildes) == -1) {
-		perror("error in pipe()");
+		if (dc) pr_perror(dc, "error in pipe()");
 		free(mgr);
 		return NULL;
 	}
@@ -452,7 +532,7 @@ struct vpn_manager *detour_launch_openvpn(const char *addr)
 	pid = fork();
 	if (pid == -1) {
 		/* error */
-		perror("error forking");
+		if (dc) pr_perror(dc, "error forking");
 		free(mgr);
 		return NULL;
 	} else if (pid == 0) {
@@ -470,7 +550,7 @@ struct vpn_manager *detour_launch_openvpn(const char *addr)
 	} else {
 		/* parent */
 		mgr->openvpn_pid = pid;
-		wait_for_openvpn(mgr);
+		wait_for_openvpn(dc, mgr);
 		return mgr;
 	}
 }
@@ -479,25 +559,27 @@ struct vpn_manager *detour_launch_openvpn(const char *addr)
  * Return a "detour manager" for a given IP address, or NULL on error.
  * TODO: allow hostnames
  */
-struct detour_manager *make_detour_manager(const char *ipaddr)
+struct detour_manager *make_detour_manager(struct daemon_config *dc,
+                                           const char *ipaddr)
 {
 	struct detour_manager *mgr = malloc(sizeof(struct detour_manager));
 	mgr->addr.sin_family = AF_INET;
 	if (!inet_aton(ipaddr, &mgr->addr.sin_addr)) {
-		fprintf(stderr, "invalid detour ip address\n");
+		pr_err(dc, "invalid detour ip address\n");
 		goto destroy;
 	}
 	mgr->addr.sin_port = MPROXY_DEFAULT_PORT;
 	mgr->sk = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 	if (mgr->sk == -1) {
-		perror("socket");
+		pr_perror(dc, "socket");
 		goto destroy;
 	}
 	if (connect(mgr->sk, (struct sockaddr*)&mgr->addr,
 	            sizeof(struct sockaddr)) == -1) {
-		perror("connect");
+		pr_perror(dc, "connect");
 		goto destroy;
 	}
+	pr_notice(dc, "Established detour_manager for %s", ipaddr);
 	return mgr;
 destroy:
 	free(mgr);
@@ -507,9 +589,10 @@ destroy:
 /**
  * Free resources held by a detour manager list (socket and memory)
  */
-void destroy_detour_list(struct detour_manager *mgr)
+void destroy_detour_list(struct daemon_config *dc)
 {
-	struct detour_manager *next;
+	struct detour_manager *next, *mgr = dc->detours;
+	pr_info(dc, "closing all detour sockets\n");
 	while (mgr) {
 		next = mgr->next;
 		close(mgr->sk);
@@ -522,16 +605,19 @@ void destroy_detour_list(struct detour_manager *mgr)
  * Free resources held by a detour manager list (kills openvpn, closes its
  * stdout, and frees memory associated with manager).
  */
-void destroy_vpn_list(struct vpn_manager *mgr)
+void destroy_vpn_list(struct daemon_config *dc)
 {
-	struct vpn_manager *next;
+	struct vpn_manager *next, *mgr = dc->vpns;
+	pr_info(dc, "killing all openvpn connections\n");
 	while (mgr) {
 		int status;
 		next = mgr->next;
+		pr_debug(dc, "SIGTERM -> %d\n", mgr->openvpn_pid);
 		kill(mgr->openvpn_pid, SIGTERM);
 		// ensure that openvpn terminates and don't create a zombie
 		// (in case our process stays around longer than expected)
 		do {
+			pr_debug(dc, "waitpid(%d)\n", mgr->openvpn_pid);
 			waitpid(mgr->openvpn_pid, &status, 0);
 		} while (!WIFEXITED(status) || !WIFSIGNALED(status));
 		close(mgr->fildes[0]);
@@ -547,9 +633,33 @@ void destroy_vpn_list(struct vpn_manager *mgr)
  */
 void destroy_daemon_config(struct daemon_config *dc)
 {
-	destroy_detour_list(dc->detours);
-	destroy_vpn_list(dc->vpns);
+	pr_notice(dc, "destroying daemon config. goodbye, cruel world\n");
+	destroy_detour_list(dc);
+	destroy_vpn_list(dc);
 	free(dc);
+}
+
+/**
+ * Run as a daemon. When this function returns, you are a daemon >:)
+ *
+ * Normally when you think "daemonize", you think fork twice. However, in our
+ * case, the parent is going to exit immediately after forking anyway, so the
+ * second fork (whose purpose is to avoid creating a zombie process when the
+ * parent continues running) is unnecessary.
+ */
+void daemonize(void)
+{
+	pid_t pid = fork();
+	if (pid == -1) {
+		/* error */
+		perror("when trying to daemonize:");
+	} else if (pid == 0) {
+		/* child */
+		return;
+	} else {
+		printf("daemon started successfully\n");
+		exit(EXIT_SUCCESS);
+	}
 }
 
 /**
@@ -565,7 +675,7 @@ struct daemon_config *parse_config(char *filename)
 	struct daemon_config *dc = malloc(sizeof(struct daemon_config));
 	struct detour_manager *mgr = NULL;
 	struct vpn_manager *vmgr = NULL;
-	const char *ip;
+	const char *ip, *file=NULL, *level=NULL;
 	config_t conf;
 	config_setting_t *setting;
 
@@ -576,6 +686,30 @@ struct daemon_config *parse_config(char *filename)
 		        config_error_line(&conf), config_error_text(&conf));
 		goto destroy;
 	}
+
+	/* init logging config */
+	dc->daemonize = false;
+	dc->logfile = stdout;
+	dc->loglevel = LEVEL_DEFAULT;
+	config_lookup_bool(&conf, "client.daemonize", &dc->daemonize);
+	config_lookup_string(&conf, "client.logfile", &file);
+	config_lookup_string(&conf, "client.loglevel", &level);
+	if (file) {
+		dc->logfile = fopen(file, "a");
+		if (!dc->logfile) {
+			perror("could not open log file");
+			goto destroy;
+		}
+	}
+	if (level)
+		for (i = 0; i < nelem(levels); i++)
+			if (strcmp(levels[i], level) == 0)
+				dc->loglevel = i;
+
+	/* daemonize now! */
+	if (dc->daemonize)
+		daemonize();
+
 
 	/* Get "detour" items from config. */
 	setting = config_lookup(&conf, "client.detours");
@@ -591,7 +725,7 @@ struct daemon_config *parse_config(char *filename)
 			fprintf(stderr, "detours must be strings\n");
 			goto destroy_detours;
 		}
-		mgr = make_detour_manager(ip);
+		mgr = make_detour_manager(dc, ip);
 		if (!mgr)
 			goto destroy_detours;
 		mgr->next = dc->detours;
@@ -612,7 +746,7 @@ struct daemon_config *parse_config(char *filename)
 			fprintf(stderr, "vpns must be strings\n");
 			goto destroy_vpns;
 		}
-		vmgr = detour_launch_openvpn(ip);
+		vmgr = detour_launch_openvpn(dc, ip);
 		if (!vmgr)
 			goto destroy_vpns;
 		vmgr->next = dc->vpns;
@@ -621,9 +755,9 @@ struct daemon_config *parse_config(char *filename)
 
 	return dc;
 destroy_vpns:
-	destroy_vpn_list(dc->vpns);
+	destroy_vpn_list(dc);
 destroy_detours:
-	destroy_detour_list(dc->detours);
+	destroy_detour_list(dc);
 destroy:
 	config_destroy(&conf);
 	return NULL;
@@ -636,6 +770,7 @@ int report_vpns(struct daemon_config *dc)
 {
 	struct vpn_manager *mgr = dc->vpns;
 	int rc = 0;
+	pr_info(dc, "reporting vpn entries to the kernel\n");
 	while (mgr) {
 		rc = detour_add_or_del_if(dc->sk, mgr->ifname, DETOUR_C_ADD);
 		if (rc) {
@@ -763,7 +898,7 @@ int cli_vpn(struct nl_sock *sk, int argc, char *argv[])
 		return -1;
 	}
 	struct daemon_config cfg;
-	cfg.vpns = detour_launch_openvpn(argv[2]);
+	cfg.vpns = detour_launch_openvpn(NULL, argv[2]);
 	cfg.vpns->next = NULL;
 	cfg.sk = sk;
 	printf("vpn: %s\n", cfg.vpns->ifname);
