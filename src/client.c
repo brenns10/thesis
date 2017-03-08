@@ -11,6 +11,7 @@
 
 #include <unistd.h>
 #include <signal.h>
+#include <wait.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -51,7 +52,7 @@ void abort_perror(char *msg)
  * A struct for tracking running VPN processes.
  * @next: linked list
  * @openvpn_pid: process ID of the openvpn process
- * @fildes: fildes[1] is stdout of openvpn, read fildes[0] to get output
+ * @fildes: fildes[1] (write) is stdout of openvpn, fildes[0] (read) gets output
  * @ifname: interface name associated with it
  */
 struct vpn_manager {
@@ -74,7 +75,11 @@ struct detour_manager {
 };
 
 /**
- * A struct for holding daemon-global data.
+ * A struct for holding daemon-global data. This is only used by the `daemon`
+ * operating mode (which is sort of the whole point of this program). It has a
+ * list of VPNs we have connections with, as well as a list of detour servers
+ * we can request a detour from. Finally, it holds some other global data and
+ * configuration.
  * @vpns: list of vpns
  * @detours: list of detours
  * @sk: netlink socket we listen on
@@ -151,6 +156,9 @@ static struct nla_policy detour_genl_policy[DETOUR_A_MAX + 1] = {
 	[DETOUR_A_IFNAME] = { .type = NLA_STRING, .maxlen = IFNAMSIZ },
 };
 
+////////////////////////////////////////////////////////////////////////////////
+// Functions to Call Kernel Netlink Handlers
+////////////////////////////////////////////////////////////////////////////////
 
 /**
  * Call the DETUOR_C_ECHO function in the kernel. The function itself takes no
@@ -243,6 +251,10 @@ nla_put_failure:
 	return rc;
 }
 
+////////////////////////////////////////////////////////////////////////////////
+// Callbacks for Requests from Kernel
+////////////////////////////////////////////////////////////////////////////////
+
 /**
  * Callback function for DETOUR_C_REQ messages. Parses the message and then
  * echoes it to stdout.
@@ -270,47 +282,15 @@ int detour_req_echo_cb(struct nl_msg *msg, void *arg)
 	return NL_STOP;
 }
 
-/**
- * Send a request to each UDP socket.
- */
-int send_requests(struct daemon_config *dc, struct mproxy_request *req)
-{
-	struct detour_manager *mgr = dc->detours;
-	while (mgr) {
-		if (send(mgr->sk, req, sizeof(*req), 0) != sizeof(*req)) {
-			perror("failed to send mproxy request");
-			return -1;
-		}
-		mgr = mgr->next;
-	}
-	return 0;
-}
-
-/**
- * Receive a response from each UDP socket and forward it to the kernel. This
- * assumes that we will get a response - it is worth adding a timeout here
- * (TODO).
- */
-int recv_responses(struct daemon_config *dc)
-{
-	struct detour_manager *mgr = dc->detours;
-	struct mproxy_request req;
-	while (mgr) {
-		if (recv(mgr->sk, &req, sizeof(req), 0) != sizeof(req)) {
-			perror("failed to recv mproxy response");
-			return -1;
-		}
-		detour_add_or_del(dc->sk, &mgr->addr.sin_addr, req.dpt,
-		                  (struct in_addr*)&req.rip, req.rpt,
-		                  DETOUR_C_ADD);
-		mgr = mgr->next;
-	}
-	return 0;
-}
+// forward declarations
+int send_requests(struct daemon_config *dc, struct mproxy_request *req);
+int recv_responses(struct daemon_config *dc);
 
 /**
  * Callback function for DETOUR_C_REQ messages. Parses the message, requests
- * detour(s) via UDP, and then informs the kernel of the new detour(s).
+ * detour(s) via UDP, and then informs the kernel of the new detour(s). Used in
+ * daemon mode.
+ * @param arg: daemon config
  */
 int detour_req_create_cb(struct nl_msg *msg, void *arg)
 {
@@ -345,6 +325,49 @@ int detour_req_create_cb(struct nl_msg *msg, void *arg)
 
 	return NL_STOP;
 }
+
+////////////////////////////////////////////////////////////////////////////////
+// Daemon Management Functions
+////////////////////////////////////////////////////////////////////////////////
+
+/**
+ * Send a mproxy detour request to each UDP socket in the daemon.
+ */
+int send_requests(struct daemon_config *dc, struct mproxy_request *req)
+{
+	struct detour_manager *mgr = dc->detours;
+	while (mgr) {
+		if (send(mgr->sk, req, sizeof(*req), 0) != sizeof(*req)) {
+			perror("failed to send mproxy request");
+			return -1;
+		}
+		mgr = mgr->next;
+	}
+	return 0;
+}
+
+/**
+ * Receive a mproxy response from each UDP socket and forward it to the kernel.
+ * This assumes that we will get a response - it is worth adding a timeout here
+ * (TODO).
+ */
+int recv_responses(struct daemon_config *dc)
+{
+	struct detour_manager *mgr = dc->detours;
+	struct mproxy_request req;
+	while (mgr) {
+		if (recv(mgr->sk, &req, sizeof(req), 0) != sizeof(req)) {
+			perror("failed to recv mproxy response");
+			return -1;
+		}
+		detour_add_or_del(dc->sk, &mgr->addr.sin_addr, req.dpt,
+		                  (struct in_addr*)&req.rip, req.rpt,
+		                  DETOUR_C_ADD);
+		mgr = mgr->next;
+	}
+	return 0;
+}
+
 
 /**
  * Wait for OpenVPN to initialize itself. We do this by reading lines from its
@@ -395,6 +418,7 @@ void wait_for_openvpn(struct vpn_manager *mgr)
 
 /**
  * Fork and launch OpenVPN in client mode. Returns in the parent, not the child.
+ * This will wait for OpenVPN to initialize itself.
  * @param addr Address of the remote server
  * @returns A pointer to the filled out struct vpn_manager
  */
@@ -451,63 +475,6 @@ struct vpn_manager *detour_launch_openvpn(const char *addr)
 	}
 }
 
-/** Call DETOUR_C_ECHO, either using CLI provided string or a default. */
-int cli_echo(struct nl_sock *sk, int argc, char *argv[])
-{
-	return detour_echo(sk);
-}
-
-/** Call DETOUR_C_ADD, using arguments from CLI. */
-int cli_add_or_del(struct nl_sock *sk, int argc, char *argv[], uint8_t cmd)
-{
-	struct in_addr dip, rip;
-	uint16_t dpt, rpt;
-	if (argc != 6) {
-		fprintf(stderr, "add requires 4 arguments\n");
-		fprintf(stderr, "%s %s DIP DPT RIP RPT", argv[0], argv[1]);
-		return -1;
-	}
-	if (!inet_aton(argv[2], &dip) || !inet_aton(argv[4], &rip)) {
-		fprintf(stderr, "\"%s\" or \"%s\" is not a valid IP\n", argv[2],
-			argv[4]);
-		return -1;
-	}
-	if (1 != sscanf(argv[3], "%hu", &dpt)) {
-		fprintf(stderr, "\"%s\" is not a valid port\n", argv[3]);
-		return -1;
-	}
-	if (1 != sscanf(argv[5], "%hu", &rpt)) {
-		fprintf(stderr, "\"%s\" is not a valid port\n", argv[5]);
-		return -1;
-	}
-	return detour_add_or_del(sk, &dip, htons(dpt), &rip, htons(rpt), cmd);
-}
-
-/** Loop waiting for DETOUR_C_REQ messages from the kernel and print them. */
-int cli_req(struct nl_sock *sk)
-{
-	int rc, calls = 0;
-	rc = nl_socket_add_memberships(sk, group, NFNLGRP_NONE);
-	if (rc < 0) {
-		nl_perror(rc, "nl_socket_add_memberships");
-		return rc;
-	}
-	rc = nl_socket_modify_cb(sk, NL_CB_MSG_IN, NL_CB_CUSTOM,
-	                         detour_req_echo_cb, NULL);
-	if (rc < 0) {
-		nl_perror(rc, "nl_cb_set");
-		return rc;
-	}
-	nl_socket_disable_seq_check(sk);
-	do {
-		rc = nl_recvmsgs_default(sk);
-	} while (++calls < MAX_CALLS && rc >= 0);
-	if (rc < 0) {
-		nl_perror(rc, "nl_recvmsgs");
-	}
-	return rc;
-}
-
 /**
  * Return a "detour manager" for a given IP address, or NULL on error.
  * TODO: allow hostnames
@@ -559,8 +526,14 @@ void destroy_vpn_list(struct vpn_manager *mgr)
 {
 	struct vpn_manager *next;
 	while (mgr) {
+		int status;
 		next = mgr->next;
 		kill(mgr->openvpn_pid, SIGTERM);
+		// ensure that openvpn terminates and don't create a zombie
+		// (in case our process stays around longer than expected)
+		do {
+			waitpid(mgr->openvpn_pid, &status, 0);
+		} while (!WIFEXITED(status) || !WIFSIGNALED(status));
 		close(mgr->fildes[0]);
 		close(mgr->fildes[1]);
 		free(mgr);
@@ -673,6 +646,67 @@ int report_vpns(struct daemon_config *dc)
 	return rc;
 }
 
+////////////////////////////////////////////////////////////////////////////////
+// Functions for CLI
+////////////////////////////////////////////////////////////////////////////////
+
+/** Call DETOUR_C_ECHO, either using CLI provided string or a default. */
+int cli_echo(struct nl_sock *sk, int argc, char *argv[])
+{
+	return detour_echo(sk);
+}
+
+/** Call DETOUR_C_ADD, using arguments from CLI. */
+int cli_add_or_del(struct nl_sock *sk, int argc, char *argv[], uint8_t cmd)
+{
+	struct in_addr dip, rip;
+	uint16_t dpt, rpt;
+	if (argc != 6) {
+		fprintf(stderr, "add requires 4 arguments\n");
+		fprintf(stderr, "%s %s DIP DPT RIP RPT", argv[0], argv[1]);
+		return -1;
+	}
+	if (!inet_aton(argv[2], &dip) || !inet_aton(argv[4], &rip)) {
+		fprintf(stderr, "\"%s\" or \"%s\" is not a valid IP\n", argv[2],
+			argv[4]);
+		return -1;
+	}
+	if (1 != sscanf(argv[3], "%hu", &dpt)) {
+		fprintf(stderr, "\"%s\" is not a valid port\n", argv[3]);
+		return -1;
+	}
+	if (1 != sscanf(argv[5], "%hu", &rpt)) {
+		fprintf(stderr, "\"%s\" is not a valid port\n", argv[5]);
+		return -1;
+	}
+	return detour_add_or_del(sk, &dip, htons(dpt), &rip, htons(rpt), cmd);
+}
+
+/** Loop waiting for DETOUR_C_REQ messages from the kernel and print them. */
+int cli_req(struct nl_sock *sk)
+{
+	int rc, calls = 0;
+	rc = nl_socket_add_memberships(sk, group, NFNLGRP_NONE);
+	if (rc < 0) {
+		nl_perror(rc, "nl_socket_add_memberships");
+		return rc;
+	}
+	rc = nl_socket_modify_cb(sk, NL_CB_MSG_IN, NL_CB_CUSTOM,
+	                         detour_req_echo_cb, NULL);
+	if (rc < 0) {
+		nl_perror(rc, "nl_cb_set");
+		return rc;
+	}
+	nl_socket_disable_seq_check(sk);
+	do {
+		rc = nl_recvmsgs_default(sk);
+	} while (++calls < MAX_CALLS && rc >= 0);
+	if (rc < 0) {
+		nl_perror(rc, "nl_recvmsgs");
+	}
+	return rc;
+}
+
 /**
  * Daemon-mode for cli. This is the "main point" of this client: wait for detour
  * requests from the kernel, send them to our detour server, and inform the
@@ -738,6 +772,8 @@ int cli_vpn(struct nl_sock *sk, int argc, char *argv[])
 	printf("done.\n");
 	return 0;
 }
+
+////////////////////////////////////////////////////////////////////////////////
 
 /**
  * Parses first argument and invokes the correct cli_ function.
