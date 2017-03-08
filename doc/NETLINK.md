@@ -15,6 +15,10 @@ Add a detour entry. A detour entry consists of:
 - A server IP - `DETOUR_A_REMOTE_IP`
 - A server port - `DETOUR_A_REMOTE_PORT`
 
+Or, it could consist of:
+
+- A detour interface name - `DETOUR_A_IFNAME`
+
 ### DETOUR_C_DEL
 
 Remove a detour entry. This will probably only delete the entry from the list,
@@ -24,6 +28,10 @@ without terminating any subflows through this detour.
 - `DETOUR_A_DETOUR_PORT`
 - `DETOUR_A_REMOTE_IP`
 - `DETOUR_A_REMOTE_PORT`
+
+Or,
+
+- `DETOUR_A_IFNAME`
 
 ### DETOUR_C_REQ
 
@@ -58,3 +66,8 @@ order.
 
 TCP port of the server (remote end of connection). Type is U16, network byte
 order.
+
+### DETOUR_A_IFNAME
+
+The name of the interface to use as a detour. This interface ought to be an
+OpenVPN tunnel.
