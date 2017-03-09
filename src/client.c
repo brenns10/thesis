@@ -38,6 +38,18 @@ void abort_perror(char *msg)
 }
 
 /**
+ * Index of a string in an array of strings.
+ */
+ssize_t indexof(char **arr, size_t nelem, const char *str)
+{
+	size_t i;
+	for (i = 0; i < nelem; i++)
+		if (strcmp(arr[i], str) == 0)
+			return i;
+	return -1;
+}
+
+/**
  * How many calls should the DETOUR_C_REQ echo handler listen to before quit?
  */
 #define MAX_CALLS 5
@@ -698,10 +710,10 @@ struct daemon_config *parse_config(char *filename)
 			goto destroy;
 		}
 	}
-	if (level)
-		for (i = 0; i < nelem(levels); i++)
-			if (strcmp(levels[i], level) == 0)
-				dc->loglevel = i;
+	if (level) {
+		dc->loglevel = indexof(levels, nelem(levels), level);
+		dc->loglevel = dc->loglevel < 0 ? LEVEL_DEFAULT : dc->loglevel;
+	}
 
 	/* daemonize now! */
 	if (dc->daemonize)
@@ -750,6 +762,7 @@ struct daemon_config *parse_config(char *filename)
 		dc->vpns = vmgr;
 	}
 
+	config_destroy(&conf);
 	return dc;
 destroy_vpns:
 	destroy_vpn_list(dc);
@@ -814,9 +827,21 @@ int cli_add_or_del(struct nl_sock *sk, int argc, char *argv[], uint8_t cmd)
 	return detour_add_or_del(sk, &dip, htons(dpt), &rip, htons(rpt), cmd);
 }
 
-/** Loop waiting for DETOUR_C_REQ messages from the kernel and print them. */
-int cli_req(struct nl_sock *sk)
+int cli_add(struct nl_sock *sk, int argc, char *argv[])
 {
+	return cli_add_or_del(sk, argc, argv, DETOUR_C_ADD);
+}
+
+int cli_del(struct nl_sock *sk, int argc, char *argv[])
+{
+	return cli_add_or_del(sk, argc, argv, DETOUR_C_DEL);
+}
+
+/** Loop waiting for DETOUR_C_REQ messages from the kernel and print them. */
+int cli_req(struct nl_sock *sk, int argc, char *argv[])
+{
+	(void)argc;
+	(void)argv;
 	int rc, calls = 0;
 	rc = nl_socket_add_memberships(sk, group, NFNLGRP_NONE);
 	if (rc < 0) {
@@ -907,12 +932,30 @@ int cli_vpn(struct nl_sock *sk, int argc, char *argv[])
 
 ////////////////////////////////////////////////////////////////////////////////
 
+char *cmd_names[] = {
+	"echo",
+	"add",
+	"del",
+	"req",
+	"daemon",
+	"vpn",
+};
+int (*cmd_funcs[])(struct nl_sock*, int, char*[]) = {
+	cli_echo,
+	cli_add,
+	cli_del,
+	cli_req,
+	cli_daemon,
+	cli_vpn,
+};
+
 /**
  * Parses first argument and invokes the correct cli_ function.
  */
 int main(int argc, char *argv[])
 {
 	struct nl_sock *sk;
+	ssize_t cmd_idx;
 	int rc = EXIT_SUCCESS;
 
 	if (argc < 2) {
@@ -947,18 +990,9 @@ int main(int argc, char *argv[])
 		goto exit;
 	}
 
-	if (strcmp(argv[1], "echo") == 0) {
-		rc = cli_echo(sk, argc, argv);
-	} else if (strcmp(argv[1], "add") == 0) {
-		rc = cli_add_or_del(sk, argc, argv, DETOUR_C_ADD);
-	} else if (strcmp(argv[1], "del") == 0) {
-		rc = cli_add_or_del(sk, argc, argv, DETOUR_C_DEL);
-	} else if (strcmp(argv[1], "req") == 0) {
-		rc = cli_req(sk);
-	} else if (strcmp(argv[1], "daemon") == 0) {
-		rc = cli_daemon(sk, argc, argv);
-	} else if (strcmp(argv[1], "vpn") == 0) {
-		rc = cli_vpn(sk, argc, argv);
+	cmd_idx = indexof(cmd_names, nelem(cmd_names), argv[1]);
+	if (cmd_idx < 0) {
+		rc = cmd_funcs[cmd_idx](sk, argc, argv);
 	} else {
 		fprintf(stderr, "\"%s\" is not a valid command\n", argv[1]);
 		rc = EXIT_FAILURE;
