@@ -59,7 +59,7 @@ void abort_perror(char *msg)
 
 /**
  * Log levels - messages with level <= the set level are logged. Note similarity
- * kernel log levels.
+ * to kernel log levels.
  */
 enum {
 	LEVEL_EMERG = 0,
@@ -384,7 +384,7 @@ int detour_req_create_cb(struct nl_msg *msg, void *arg)
 	req.rpt = nla_get_u16(attrs[DETOUR_A_REMOTE_PORT]);
 	req.dpt = req.rpt;
 	pr_info(dc, "received request: %s:%u\n",
-	        inet_ntoa(IN_ADDR(req.rip)), req.rpt);
+	        inet_ntoa(IN_ADDR(req.rip)), htons(req.rpt));
 
 	if (send_requests(dc, &req)) {
 		return NL_STOP;
@@ -400,7 +400,6 @@ int detour_req_create_cb(struct nl_msg *msg, void *arg)
 ////////////////////////////////////////////////////////////////////////////////
 // Daemon Management Functions
 ////////////////////////////////////////////////////////////////////////////////
-
 
 /**
  * Send a mproxy detour request to each UDP socket in the daemon.
