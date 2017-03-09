@@ -4,8 +4,6 @@
  * run: ./client CMD [ARGS ...]
  *
  * TODO: if scalability is required/desired, we need threading
- * TODO: logging
- * TODO: daemonize
  */
 
 #include <stdio.h>
