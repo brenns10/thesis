@@ -1,0 +1,42 @@
+\section{Background}
+% Potential additions:
+% - netlink? generic netlink?
+
+\subsection{Multipath TCP}
+% Our discussion of Multipath TCP needs to be in enough depth that the reader
+% understands how it works - essentially covering at least the first few pages
+% of the RFC. In particular:
+% - Subflows: what they are and how they work
+% - How the initial subflow is created
+% - How subsequent subflows are created and authenticated
+% - Data sequencing and how data sequences are mapped onto subflow sequences
+% - path management and data scheduling
+% - ? how the linux kernel implementation is structured
+
+In recent years, multi-homed devices have become increasingly common. The most
+obvious example of these devices is the smartphone, which typically comes with
+at least two network interfaces: one for cellular data, and one for Wi-Fi. While
+these devices have become more common, most Internet protocols do not have ways
+to take advantage of multiple interfaces.
+
+Multipath TCP (MPTCP) is an extension to TCP which aims to mitigate this
+problem. It is designed with several goals in mind:
+
+\begin{itemize}
+  \item To improve both the throughput and reliability of connections, relative
+    to normal TCP.
+  \item To remain compatible with applications that use TCP, so that they could
+    use MPTCP without modification.
+  \item To remain compatible with the Internet as a whole, especially with
+    ``middleware'' such as firewalls, proxies, and NATs.
+\end{itemize}
+% https://tools.ietf.org/html/rfc6182#section-2
+
+It achieves these goals by layering the protocol b
+
+\subsection{Netfilter}
+% Discuss what it is, and how it can be used to perform NAT
+
+\subsection{OpenVPN}
+% This will have to at least touch on TUN/TAP devices, and the variations of the
+% OpenVPN protocol.
