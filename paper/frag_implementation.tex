@@ -1,0 +1,62 @@
+\section{Implementation}
+
+% smoother transition once we have everything
+
+% Section intro:
+% 1. Expectations (what hosts are there, and which ones run our code?)
+% 2. Overview of the distinct pieces of software (client kernel, client daemon,
+%    detour daemon)
+% Subsection - Two Ways of Detours
+% Subsection - Client kernel
+% Subsection - Client daemon
+% Subsection - Detour daemon
+
+The implementation of this project is based on the following expectations.
+First, the server must support Multipath TCP. However, beyond this, no other
+modifications should be required of the server. Second, the client and detour
+point are assumed to be ``active'' participants in the collective, and so they
+may run whatever software is necessary to participate.
+
+The client must run a modified kernel, which supports creating MPTCP subflows
+across detours. In addition, the client must also run a daemon which discovers
+and negotiates with detour points, finally reporting available ones to the
+kernel. These concerns remain separate for several reasons. First, communication
+with detour points requires communication over the Internet. While it is
+possible to do user-level networking within the kernel, it is much simpler and
+more future-proof to use the userspace socket API. Second, one type of detour
+requires starting an OpenVPN process, an operation which should only be done
+from userspace. Finally, userspace tools may be more easily configured and can
+perform a more broad spectrum of computations, such as floating point math.
+
+The detour need not support Multipath TCP. However, it must run one of two
+possible daemons, depending on which type of detour it will be hosting.
+
+\subsection{Detour Types}
+
+In this project, we implement two different mechanisms for tunneling MPTCP
+subflows across a detour.
+
+\subsubsection{OpenVPN Tunneling}
+
+The first mechanism involves the open-source tool OpenVPN. Detours run a
+specially configured OpenVPN server, and clients connect. Unlike typical VPN
+configurations, the client does not route all traffic through the VPN. Instead,
+the client simply uses the VPN as a second network device. The client can then
+use the VPN network device just as it would use any other physical device.
+
+Traffic that goes through the VPN must undergo network address translation upon
+reaching the detour point, since it functionally acts as a router.
+
+\subsubsection{NAT Tunneling}
+
+The second approach directly leverages NAT, without using OpenVPN for tunneling.
+Since we only want to forward certain connections, we don't need the full power
+of OpenVPN, and thus we can circumvent the overhead that comes with
+encapsulation of datagrams.
+
+The Linux kernel contains a robust packet filtering framework, known as
+Netfilter. This framework includes utilities for performing network address
+translation (NAT). This framework is typically what is used by consumer-grade
+routers. Instead of encapsulation, the NAT tunneling approach directly addresses
+the IP packets to the detour. The detour rewrites the source and destination
+addresses using Netfilter for connection tracking.
