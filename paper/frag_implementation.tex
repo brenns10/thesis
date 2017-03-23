@@ -1,15 +1,13 @@
 \section{Implementation}
-
-% smoother transition once we have everything
-
 % Section intro:
 % 1. Expectations (what hosts are there, and which ones run our code?)
 % 2. Overview of the distinct pieces of software (client kernel, client daemon,
 %    detour daemon)
-% Subsection - Two Ways of Detours
+% Subsection - Detour daemon
 % Subsection - Client kernel
 % Subsection - Client daemon
-% Subsection - Detour daemon
+
+% smoother transition once we have everything
 
 The implementation of this project is based on the following expectations.
 First, the server must support Multipath TCP. However, beyond this, no other
@@ -31,32 +29,111 @@ perform a more broad spectrum of computations, such as floating point math.
 The detour need not support Multipath TCP. However, it must run one of two
 possible daemons, depending on which type of detour it will be hosting.
 
-\subsection{Detour Types}
+\subsection{Detour Daemon}
 
 In this project, we implement two different mechanisms for tunneling MPTCP
-subflows across a detour.
+subflows across a detour. In both cases, the detour host must run a daemon that
+assists in tunneling traffic from the client to the server.
 
 \subsubsection{OpenVPN Tunneling}
 
 The first mechanism involves the open-source tool OpenVPN. Detours run a
-specially configured OpenVPN server, and clients connect. Unlike typical VPN
-configurations, the client does not route all traffic through the VPN. Instead,
-the client simply uses the VPN as a second network device. The client can then
-use the VPN network device just as it would use any other physical device.
+specially configured OpenVPN server. Clients connect to this VPN, creating a
+virtual network device. The client receives a routing rule from the detour
+advertising that it can reach all hosts on the Internet with a very high cost.
+As a result, the client operating system will prefer other routes to the VPN.
 
-Traffic that goes through the VPN must undergo network address translation upon
-reaching the detour point, since it functionally acts as a router.
+The VPN connection is configured as follows:
+
+\begin{itemize}
+\item The connection is over UDP, to avoid the so-called ``TCP Meltdown'' effect
+  caused by two congestion control algorithms interfering with each other.
+  % TODO citation
+\item The initial connection negotiation requires the client and server to
+  exchange certificates. OpenVPN allows the user to specify the PKI root. A
+  centralized detour management system could authorize clients and servers by
+  signing certificates, enabling tunneling for members and preventing it for
+  non-members.
+\item Subsequent messages are not protected by encryption or signatures, to
+  avoid the computational overhead.
+\end{itemize}
+
+One important aspect of VPN configuration is that the detour must create a
+private IP subnet. It will provide a DHCP service in order to assign IP
+addresses to clients as they connect to the VPN. Clients are expected to be able
+to connect to multiple detours simultaneously. In order to do this without
+conflict, each detour must use a distinct private IP subnet, so that there is no
+chance of the client addresses overlapping, and also so that the gateway address
+of the VPN is unique on the client.
+
+In a large-scale implementation of this technology, these subnet allocations
+could be handled by a centralized detour management server. The 10.0.0.0/8
+subnet is reserved for private networks, and if each detour were to establish
+its own /24 subnet, there would be capacity for 65,536 non-conflicting subnets.
+However, in our testing, subnets were manually allocated to avoid conflicts.
+
+Finally, in order to forward VPN traffic to the internet, the detour must be
+configured (via Netfilter) to perform network address translation (NAT) on
+outgoing packets. This process is typical for a home router and for VPNs which
+provide Internet access. Multipath TCP is designed with this behavior in mind,
+and so it is capable of functioning through NAT, so long as the middleboxes do
+not remove TCP options in transit.
+
+% TODO cite MPTCP design/architecture for middleboxes
+
+The OpenVPN implementation has several attractive qualities. First, it relies on
+a well-used protocol for forwarding traffic. Second, it need not be configured
+on a per-connection basis. Finally, it provides a built in mechanism for
+mutually authenticating the client and detour. However, there are some
+drawbacks. Since packets are tunneled, at least 28 bytes of overhead (IP and UDP
+headers) are required. To avoid fragmentation, the connection's maximum segment
+size (MSS) must be adjusted.
 
 \subsubsection{NAT Tunneling}
 
-The second approach directly leverages NAT, without using OpenVPN for tunneling.
-Since we only want to forward certain connections, we don't need the full power
-of OpenVPN, and thus we can circumvent the overhead that comes with
-encapsulation of datagrams.
+The second approach directly modifies packets, without actually using a protocol
+(like OpenVPN) for tunneling. Since we only need to forward some connections to
+some destinations, the full power of OpenVPN is not necessary. Instead, packets
+are addressed directly to the detour. The detour can forward these to the
+final destination, and forward reply packets to the client. In order to do this,
+the detour must have advance knowledge of the final destination of the packet.
+So, clients use a simple signaling protocol to request tunnels via a detour.
 
-The Linux kernel contains a robust packet filtering framework, known as
-Netfilter. This framework includes utilities for performing network address
-translation (NAT). This framework is typically what is used by consumer-grade
-routers. Instead of encapsulation, the NAT tunneling approach directly addresses
-the IP packets to the detour. The detour rewrites the source and destination
-addresses using Netfilter for connection tracking.
+The Linux kernel's Netfilter framework allows for two types of NAT. The first
+kind is source NAT, or SNAT, rewrites the source address of the packet. This is
+the typical form of NAT used by home routers: the source address of an outgoing
+connection is rewritten to be the router's external IP address, but the
+destination is unchanged. The second kind of NAT supported by Netfilter is
+destination NAT, or DNAT. This rewrites the destination address of the packet.
+
+% TODO - netfilter docs citation
+
+The detour takes advantage of both forms of NAT offered by the kernel. First, it
+applies DNAT, setting the destination address to be the final server's IP
+address (arranged ahead of time). Then, it applies SNAT, setting the source
+address to be its own external IP. The Netfilter framework remembers these
+connections so that reply packets are properly forwarded back to the client.
+
+Thanks to Netfilter, this NAT mapping can be arranged with two \texttt{iptables}
+commands, with no custom kernel or user-space code required for packet
+forwarding. It is possible to implement this in userspace using raw sockets, but
+this approach has several drawbacks. It would have to be single-threaded, and it
+would require that packet data be copied from kernel space into user space and
+back. More critically, the connection tracking provided by the kernel is more
+robust than what would be implemented by user space.
+
+As mentioned earlier, the server address must be communicated to the detour
+ahead of time in order to use this scheme. To that end, we have designed a
+simple UDP-based for clients to ``request'' NAT mappings from a detour. The
+detour listens for requests on UDP port 45672. The request format is shown
+below.
+
+\begin{listing}
++-----------------------------------+
+| ver(1) | op(1)  | reserved (2)    |
++-----------------------------------+
+|           rip (4 bytes)           |
++-----------------------------------+
+| rpt (2 bytes)   | dpt (2 bytes)   |
++-----------------|-----------------+
+\end{listing}
