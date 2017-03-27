@@ -128,7 +128,7 @@ simple UDP-based for clients to ``request'' NAT mappings from a detour. The
 detour listens for requests on UDP port 45672. The request format is shown
 below.
 
-\begin{listing}
+\begin{lstlisting}
 +-----------------------------------+
 | ver(1) | op(1)  | reserved (2)    |
 +-----------------------------------+
@@ -136,4 +136,40 @@ below.
 +-----------------------------------+
 | rpt (2 bytes)   | dpt (2 bytes)   |
 +-----------------|-----------------+
-\end{listing}
+\end{lstlisting}
+
+The \texttt{ver} field is a protocol version, currently set to 1. The
+\texttt{op} field contains the operation of this message: request (0) or
+response (1). The \texttt{reserved} field is unused, currently existing to pad
+the request. The field \texttt{rip} (short for ``remote IP'') is the address
+that the client wishes to create a detour to. \texttt{rpt} is the TCP port on
+the server to create a detour to. To understand the \texttt{dpt} field, it is
+useful to describe all of the addresses and ports in use during a tunneled
+connection:
+\begin{itemize}
+\item Client IP, port: the IP address of the client, and the client-side port,
+  which is usually ephemeral.
+\item Detour IP, port (client side): the IP and port that the client will
+  address its communication to.
+\item Detour IP, port (remote side): the IP and port which are used when the
+  detour opens its corresponding connection on the remote.
+\item Remote IP, port: the IP and port which the client is tunneling its
+  connection to.
+\end{itemize}
+
+The \texttt{dpt} field corresponds to the detour port, client side. In a
+request, the client proposes a port. In the response, the detour specifies the
+actual port which will be used. The server may wish to alter the \texttt{dpt}
+field for several reasons:
+\begin{itemize}
+\item A tunnel to the remote IP, port pair is already open on a different detour
+  port.
+\item The client already has a detour open (to a different remote) on the given
+  port.
+\item The detour may have a socket accepting connection on the proposed port,
+  and so it may wish to avoid creating a tunnel which would prevent the client
+  from accessing that service.
+\end{itemize}
+
+In order to create the tunnels, the detour runs two IPTables commands, which
+create NAT rules.

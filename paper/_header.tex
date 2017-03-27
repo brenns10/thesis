@@ -2,6 +2,22 @@
 
 \usepackage[margin=1.5in]{geometry}
 \usepackage{setspace}
+\usepackage{listings}
+\usepackage{color}
+\definecolor{mygreen}{rgb}{0,0.6,0}
+\definecolor{mygray}{rgb}{0.5,0.5,0.5}
+\definecolor{mymauve}{rgb}{0.58,0,0.82}
+\lstset{%
+  backgroundcolor=\color{white},     % background color
+  basicstyle=\footnotesize\ttfamily, % monospace, small font
+  breaklines=true,                   % nice line breaks
+  captionpos=b,                      % put captions at bottom
+  commentstyle=\color{mygreen},      % comments
+  escapeinside={\%*}{*)},            % if you want to add LaTeX in code
+  keywordstyle=\color{blue},         % keyword
+  stringstyle=\color{mymauve},       % string
+}
+
 \doublespacing
 
 \title{Improving TCP connectivity via Multipath Overlays}
