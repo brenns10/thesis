@@ -172,4 +172,123 @@ field for several reasons:
 \end{itemize}
 
 In order to create the tunnels, the detour runs two IPTables commands, which
-create NAT rules.
+create NAT rules. The first performs DNAT:
+
+\begin{lstlisting}
+iptables -t nat -A PREROUTING \
+         -s (*\emph{ClientAddress}*) \
+         -d (*\emph{DetourAddress}*) \
+         -p tcp --dport (*\emph{DetourPort}*) \
+         -j DNAT --to (*\emph{RemoteAddress}*):(*\emph{RemotePort}*)
+\end{lstlisting}
+
+In this command, we add to the \texttt{nat} table, on the \texttt{PREROUTING}
+chain. Incoming packets from the client, addressed to the agreed upon
+\textit{DetourPort} are sent to the \texttt{DNAT} chain, which rewrites the
+destination address to be the agreed upon remote address and port. This must
+occur before the kernel routes the packet. Once the kernel has routed the
+packet, the DNAT rule can be applied:
+
+\begin{lstlisting}
+iptables -t nat -A POSTROUTING \
+         -s (*\emph{ClientAddress}*) \
+         -d (*\emph{RemoteAddress}*) \
+         -p tcp --dport (*\emph{RemotePort}*) \
+         -j SNAT --to (*\emph{DetourAddress})
+\end{lstlisting}
+
+Since the destination address and port have already been modified, this rule
+looks for packets addressed to the remote address and port, but still using the
+client address as the source. It jumps these packets to the DNAT chain, where
+their source address will be rewritten as the detour's address.
+
+It is important to understand that these rules are generally only applied to the
+initial SYN segment of the TCP flows. Once these rules are applied, the
+connection tracking mechanism of the kernel takes over, ensuring that these
+rules are applied in reverse to response packets.
+
+The detour daemon is implemented as a Python script. It listens for tunnel
+requests, executes the correct commands to create them, and then sends
+responses. It ensures that detour ports do not collide with each other, or with
+ports that are open on the daemon machine. It also ensures that on termination,
+all tunnels are torn down.
+
+This mechanism has the advantage that it requires zero overhead. Since no
+headers are added, the full amount of data may be transmitted on these segments.
+However, its disadvantage is that tunnels must be configured each time a new
+connection is created on the client. While the client may simply send packets to
+a new remote through an OpenVPN tunnel, it must incur a RTT delay requesting a
+new tunnel from the NAT detour before it can begin establishing a subflow.
+
+\subsection{Client Daemon}
+
+In order for the client to use detours, it must either initiate OpenVPN
+connections with them, or dynamically request tunnels via the UDP protocol. In
+either case, a client program must manage these activities. In particular, a
+program must be able to notify the kernel when new detours are available for
+immediate use, and it must be able to respond to requests from the kernel for
+new detours. The mechanism for communication with the kernel will be discussed
+in the following section.
+
+\subsubsection{OpenVPN Client Management}
+
+The client daemon reads a configuration file which informs it of detours which
+use OpenVPN. On startup, it initiates an OpenVPN connection with each detour.
+Once the connections are established, it sends a message to the kernel with the
+virtual network device's name.
+
+\subsubsection{NAT Client Management}
+
+In order to use NAT tunnels, the client daemon must be much more complex. The
+client waits for kernel tunnel requests. Upon receiving these requests, it sends
+a UDP request to each NAT detour server specified in its configuration file. It
+then waits for responses from the detour servers. Upon receiving each response,
+it sends a reply back to the kernel notifying it of the new NAT tunnel.
+
+\subsection{Client Communication}
+
+In order to communicate between kernel and userspace, we use Generic Netlink
+sockets. Netlink is an address family for the socket interface
+(\texttt{AF\_NETLINK}, similar to \texttt{AF\_INET}), which allows just this
+sort of communication. There are several types of Netlink socket, but the
+Generic Netlink type allows any kernel component to define its own protocol,
+while still managing marshalling data.
+
+Our protocol is similar to the UDP protocol for communication between the client
+and detour. The kernel sends a message of type \texttt{DETOUR_C_REQ} to a
+``multicast group'' which the client daemon subscribes to. This message contains
+the necessary parameters (remote address, remote port). The client daemon may
+reply to the kernel with \texttt{DETOUR_C_ADD} commands, which add detour
+entries, and \texttt{DETOUR_C_DEL} commands, which remove them.
+
+The protocol allows the client to register both OpenVPN and NAT based detours,
+both of which are supported in the kernel implementation.
+
+\subsection{Client Kernel}
+
+Finally, the client kernel must be capable of requesting detours, receiving
+information from userspace, and using that information to establish subflows.
+Support for this functionality is implemented as a Linux kernel module. In
+particular, it is implemented as a MPTCP ``path manager.'' A path manager is a
+kernel module which makes decisions regarding when to advertise additional
+addresses and when to create new subflows. An instance of the path manager is
+created for each MPTCP connection, when the connection becomes fully established
+(that is, after the third packet in the handshake).
+
+Upon creation, our path manager enqueues a task to be executed in a long-running
+kernel thread. This task first sends a message to userspace on the Generic
+Netlink socket, requesting a detour. Then, the task looks through an internal
+list of detours. The kernel maintains two lists of detours. The first is a list
+of OpenVPN detours. These detours are not specific to the remote port and host.
+The second list contains NAT tunnels which were created by the client daemon and
+sent to the kernel via the \texttt{DETOUR_C_ADD} command.
+
+The task attempts to add up to $N$ subflows, where $N$ is a configurable limit.
+If it cannot (due to lack of subflows), it terminates. If OpenVPN detours are
+available, then they take precedence over the NAT detours, because they are
+available immediately.
+
+When the client receives a \texttt{DETOUR_C_ADD} command, it first adds the
+details of the tunnel to its internal list. Then, if the tunnel was a NAT
+tunnel, it wakes all the path managers so that they can attempt to create a
+subflow through that tunnel.
