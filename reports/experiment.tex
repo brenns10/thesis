@@ -100,55 +100,74 @@ that it allows you full root access and you may also run custom operating
 systems. By all accounts, it seems like the best way to create reliable,
 repeatable experiments for this project's use case.
 
+\subsection{Mininet}
+
+Mininet is a single-computer network emulation platform. It allows users to
+define arbitrary network topologies, including hosts, links, and switches. The
+hosts are simply Linux processes (including potentially child processes) running
+in a separate kernel network namespace. All networking occurs on the same
+kernel, meaning that the machine running the experiment must have a custom
+kernel (rather than simply running a virtual machine with the custom kernel).
+
+It should be possible to run experiments on Mininet - the biggest concern would
+be ensuring that the required daemons and kernel modifications don't conflict
+with each other, since they would be running on the same kernel with only
+network namespaces separating them.
+
+As far as performance, making a Mininet experiment ``network-limited'' requires
+that you assign bandwidth to each link that is less than the total your CPU
+could handle. On my laptop (within a virtual machine), this maximum is around 24
+Gbps. A reasonable setup could assign each link to be 100Mbps, have several
+links and routers, and not stress the CPU for processing this.
+
 \section{Experiment Description}
 
-The experiments must be designed to answer the important questions about the
-detour routing schemes. In particular:
+The point of this thesis is to propose a mechanism for applying detour routing
+to any TCP connection. While it is out of scope to attempt to determine an
+optimal detour routing scheme, some experimentation is necessary, if for no
+other reason than to validate that this mechanism can provide the benefits of
+Multipath TCP to alternative ``detour'' routes. The main benefit of MPTCP is
+that it provides link aggregation, or in this case, path aggregation. That is,
+we are able to use the capacity of more than one path in our connection.
+
+Rather than design experiments that attempt to determine the best strategy for
+picking a detour, or the best strategy for scheduling data when you have
+multiple connections, we should simply show that this implementation provides
+these aggregation benefits. There are a couple types of benefits that we should
+attempt to quantify:
 
 \begin{itemize}
-\item Does detour routing improve connection performance when the main route is
-  unreliable? How much does it improve performance, and by what performance
-  metrics?
-\item Is there a measurable performance difference between the OpenVPN and NAT
-  approaches to detour routing?
-\item Is there a measurable performance difference between scheduling modules in
-  this scenario?
+\item Better throughput. In the case that our connection speed is bottlenecked
+  by a link that we can circumvent, we should be able to aggregate bandwidth so
+  that we improve throughput.
+\item Better response time. In the case that one path has high delay, we should
+  be able to improve response time by adding another path.
+\item Better fault tolerance. If a path has a high loss rate, we should be able
+  to improve our throughput by circumventing that lossy link.
 \end{itemize}
 
-To quantify performance, the following metrics will be useful:
-\begin{itemize}
-\item Throughput - total bytes transferred through a connection per unit time.
-\end{itemize}
-
-\subsection{Small Scale}
-
-First, we should validate that the framework performs as expected on a
-controlled network topology. A reasonable test framework would then be to set up
-a network topology with multiple routes between a client and server, vary these
-parameters, and compare the performance metrics to those of several controls:
+So, the experiments are designed around these three scenarios. We use the same
+network topologies for each scenario, but we alter the connection properties of
+a link along the ``Internet routed path'' (but not the detour routed path).
+Then, we compare the desired property (throughput or response time) to the
+following controls:
 
 \begin{itemize}
-\item Vanilla TCP, using the route which has the ``lossy'' link.
-\item Vanilla TCP, using the alternative route through the detour.
-\item Multipath TCP, unmodified. In this scenario, the network topology would be
-  altered such that the client has two interfaces and each has a different route
-  to the server.
+\item Vanilla TCP. No multipath TCP, just a single TCP flow from client to
+  server.
+\item Vanilla TCP, on the detour route.
 \end{itemize}
 
-I would hypothesize that the detour routing solution will outperform the first
-option, and it would be comparable to the rest.
+This way, we can determine whether the MPTCP detour mechanism is able to (at
+least) leverage the performance of the better path, if not aggregate their
+performance.
 
-% TODO: diagram of proposed topology
-
-\subsection{Large Scale}
-
-My ideas of what would make a suitable larger scale test are not as well-formed.
-I believe we need a larger scale test to give some indication that this approach
-could work ``in the wild''. For this sort of test, rather than setting up a
-controlled, repeatable network topology, we would simply use nodes in separate
-sites and perform a similar data transfer. The transfer would have to be
-repeated (control and MPTCP) several times in a row to give real statistical
-backbone to the experiment.
-
+These experiments could be run on Mininet or Emulab. In both cases, the results
+would be highly reproducible. If Mininet were used, we could run very many
+trials very quickly in order to get high statistical power. In addition, for
+publication we could provide a complete virtual machine image which could
+reproduce all experiments. Finally, if changes were required to the detour
+framework (as they will probably be), Mininet will allow for the quickest
+response time, so that we can run and re-run our tests quickly.
 
 \end{document}
