@@ -1,6 +1,10 @@
 """A simple custom topology that involves static routes.
 
-    h1  ---  s2  ---  h3  --- s4  ---  h5
+This custom topology has no switches, unlike the custom.py one. This is nice
+because it seems like Mininet is a little bit too heavily focused on switches,
+rather than routers. It works pretty much identically, so yay.
+
+    h1  ---  h3  ---  h5
 
 """
 
@@ -29,16 +33,12 @@ class SimpleRouteTopo(Topo):
 
         # Add hosts and switches
         h1 = self.addHost('h1', ip=H1)
-        s2 = self.addSwitch('s2')
         h3 = self.addHost('h3')
-        s4 = self.addSwitch('s4')
         h5 = self.addHost('h5', ip=H5)
 
         # Add links
-        self.addLink(h1, s2)
-        self.addLink(s2, h3)
-        self.addLink(h3, s4)
-        self.addLink(s4, h5)
+        self.addLink(h1, h3)
+        self.addLink(h3, h5)
 
 
 topos = {'simple_route': SimpleRouteTopo}
@@ -49,11 +49,10 @@ def main():
     mn = Mininet(topo=topo)
     mn.start()
     h1, h3, h5 = mn.get('h1', 'h3', 'h5')
-    s2, s4 = mn.get('s2', 's4')
 
     # H3 has multiple interfaces which are difficult to deal with in topology.
-    h3.connectionsTo(s2)[0][0].setIP(H3_LEFT + '/32')
-    h3.connectionsTo(s4)[0][0].setIP(H3_RIGHT + '/32')
+    h3.connectionsTo(h1)[0][0].setIP(H3_LEFT + '/32')
+    h3.connectionsTo(h5)[0][0].setIP(H3_RIGHT + '/32')
 
     # Next, we'll need to delete all the routes 'helpfully' established by
     # mininet.
@@ -67,8 +66,8 @@ def main():
     h1.cmd('route add -net %s gw %s' % (RIGHT, H3_LEFT))
     h5.setHostRoute(H3_RIGHT, h5.defaultIntf())
     h5.cmd('route add -net %s gw %s' % (LEFT, H3_RIGHT))
-    h3.cmd('route add -net %s dev %s' % (LEFT, h3.connectionsTo(s2)[0][0]))
-    h3.cmd('route add -net %s dev %s' % (RIGHT, h3.connectionsTo(s4)[0][0]))
+    h3.cmd('route add -net %s dev %s' % (LEFT, h3.connectionsTo(h1)[0][0]))
+    h3.cmd('route add -net %s dev %s' % (RIGHT, h3.connectionsTo(h5)[0][0]))
 
     # Finally, h3 is a router, so route, dammit!
     h3.cmd('sysctl -w net.ipv4.ip_forward=1')
