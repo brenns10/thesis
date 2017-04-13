@@ -1,10 +1,6 @@
 """A simple custom topology that involves static routes.
 
-This custom topology has no switches, unlike the custom.py one. This is nice
-because it seems like Mininet is a little bit too heavily focused on switches,
-rather than routers. It works pretty much identically, so yay.
-
-    h1  ---  h3  ---  h5
+    h1  ---  s2  ---  h3  --- s4  ---  h5
 
 """
 
