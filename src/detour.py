@@ -52,6 +52,9 @@ ch.setLevel(logging.INFO)
 log.addHandler(ch)
 
 def myip():
+    mine = os.getenv('MYIP')
+    if mine:
+        return mine
     # An unfortunate hack for getting a local IP address.  This will return the
     # address of *SOME* interface that can route us to 8.8.8.8, but not
     # necessarily the *ONLY* interface that we have. This means that if this
