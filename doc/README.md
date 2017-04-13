@@ -12,6 +12,8 @@ Setup
   (Notes for packet monitoring, in my setup)
 - [KERNEL.md](KERNEL.md)
   (Notes and instructions for kernel build configuration)
+- [MININET.md](MININET.md)
+  Rantings and information about Mininet
 
 Code Documentation
 ------------------
