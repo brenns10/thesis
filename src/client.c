@@ -939,7 +939,9 @@ char *cmd_names[] = {
 	"req",
 	"daemon",
 	"vpn",
+	"help",
 };
+int cli_help(struct nl_sock*, int, char*[]);
 int (*cmd_funcs[])(struct nl_sock*, int, char*[]) = {
 	cli_echo,
 	cli_add,
@@ -947,7 +949,27 @@ int (*cmd_funcs[])(struct nl_sock*, int, char*[]) = {
 	cli_req,
 	cli_daemon,
 	cli_vpn,
+	cli_help,
 };
+char *cmd_helps[] = {
+	"send the ECHO command, triggering a kernel log",
+	"add a NAT detour",
+	"delete a NAT detour",
+	"loop waiting for detour requests and print them",
+	"run the client detour daemon",
+	"run two OpenVPN connections",
+	"display this help message",
+};
+
+int cli_help(struct nl_sock* sk, int argc, char *argv[])
+{
+	printf("Usage: %s SUBCOMMAND [ARGS...]\n", argv[0]);
+	printf("Runs utilities related to MPTCP detour clients.\n\n");
+	printf("Subcommands:\n");
+	for (int i = 0; i < nelem(cmd_names); i++) {
+		printf("  % 8s\t%s\n", cmd_names[i], cmd_helps[i]);
+	}
+}
 
 /**
  * Parses first argument and invokes the correct cli_ function.
@@ -959,7 +981,7 @@ int main(int argc, char *argv[])
 	int rc = EXIT_SUCCESS;
 
 	if (argc < 2) {
-		fprintf(stderr, "expected at least one argument\n");
+		cli_help(NULL, argc, argv);
 		return EXIT_FAILURE;
 	}
 
@@ -991,10 +1013,11 @@ int main(int argc, char *argv[])
 	}
 
 	cmd_idx = indexof(cmd_names, nelem(cmd_names), argv[1]);
-	if (cmd_idx < 0) {
+	if (cmd_idx >= 0) {
 		rc = cmd_funcs[cmd_idx](sk, argc, argv);
 	} else {
 		fprintf(stderr, "\"%s\" is not a valid command\n", argv[1]);
+		fprintf(stderr, "try %s help for a listing\n", argv[0]);
 		rc = EXIT_FAILURE;
 	}
 
