@@ -101,8 +101,10 @@ class MProxy(object):
 
     def add_rules(self, i):
         """Add IPTables rule and record a request."""
-        sc = SNAT_COMMAND.format(**i._asdict(), dip=self._ip)
-        dc = DNAT_COMMAND.format(**i._asdict(), dip=self._ip)
+        i_dict = i._asdict()
+        i_dict['dip'] = self._ip
+        sc = SNAT_COMMAND.format(**i_dict)
+        dc = DNAT_COMMAND.format(**i_dict)
         os.system(sc)
         os.system(dc)
         log.debug(sc)
@@ -113,8 +115,10 @@ class MProxy(object):
 
     def del_rules(self, i):
         """Delete IPTables rule and recorded information."""
-        sc = SNAT_REMOVE_COMMAND.format(**i._asdict(), dip=self._ip)
-        dc = DNAT_REMOVE_COMMAND.format(**i._asdict(), dip=self._ip)
+        i_dict = i._asdict()
+        i_dict['dip'] = self._ip
+        sc = SNAT_REMOVE_COMMAND.format(**i_dict)
+        dc = DNAT_REMOVE_COMMAND.format(**i_dict)
         os.system(sc)
         os.system(dc)
         log.debug(sc)
