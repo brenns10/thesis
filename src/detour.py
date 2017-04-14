@@ -51,18 +51,15 @@ ch = logging.StreamHandler()
 ch.setLevel(logging.INFO)
 log.addHandler(ch)
 
-def myip():
-    mine = os.getenv('MYIP')
-    if mine:
-        return mine
-    # An unfortunate hack for getting a local IP address.  This will return the
-    # address of *SOME* interface that can route us to 8.8.8.8, but not
-    # necessarily the *ONLY* interface that we have. This means that if this
-    # runs on a computer which actually has multiple interfaces and receives
-    # packets on more than one of them, I'll have to modify this. But for now,
-    # it will work.
+def ip_for(address):
+    """Return the IP address of the interface that routes us to address."""
+
+    # All we do here is connect a UDP socket -- no packet is sent on it. This
+    # has the effect of asking the OS to consult its routing table to see what
+    # interface will get us to `address`. We can find that address from
+    # getsockname() after the fact. Kinda clever, in my opinion.
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    s.connect(('8.8.8.8', 53))
+    s.connect((addr, 53))  # I chose DNS well-known port, but it doesn't matter
     addr = s.getsockname()[0]
     s.close()
     return addr
@@ -100,12 +97,11 @@ class MProxy(object):
         self._entries_by_dpt = {}
         self._entries_by_rem = {}
         self._entries = set()
-        self._ip = ip if ip else myip()
 
     def add_rules(self, i):
         """Add IPTables rule and record a request."""
         i_dict = i._asdict()
-        i_dict['dip'] = self._ip
+        i_dict['dip'] = ip_for(i.rip)
         sc = SNAT_COMMAND.format(**i_dict)
         dc = DNAT_COMMAND.format(**i_dict)
         os.system(sc)
@@ -119,7 +115,7 @@ class MProxy(object):
     def del_rules(self, i):
         """Delete IPTables rule and recorded information."""
         i_dict = i._asdict()
-        i_dict['dip'] = self._ip
+        i_dict['dip'] = ip_for(i.rip)
         sc = SNAT_REMOVE_COMMAND.format(**i_dict)
         dc = DNAT_REMOVE_COMMAND.format(**i_dict)
         os.system(sc)
