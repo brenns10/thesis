@@ -168,7 +168,7 @@ void _dc_log(struct daemon_config *dc, int level, const char *format, ...)
 #define pr_default(dc, format, ...) dc_log(dc, LEVEL_DEFAULT, format, ##__VA_ARGS__)
 
 // replaces perror for logging
-#define pr_perror(dc, message) pr_err(dc, "%s: %s", message, strerror(errno))
+#define pr_perror(dc, message) pr_err(dc, "%s: %s\n", message, strerror(errno))
 
 /**
  * Format for UDP mproxy requests.
@@ -588,7 +588,7 @@ struct detour_manager *make_detour_manager(struct daemon_config *dc,
 		pr_perror(dc, "connect");
 		goto destroy;
 	}
-	pr_notice(dc, "Established detour_manager for %s", ipaddr);
+	pr_notice(dc, "Established detour_manager for %s\n", ipaddr);
 	return mgr;
 destroy:
 	free(mgr);
