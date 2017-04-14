@@ -39,7 +39,7 @@ class DetourTopo(Topo):
         self.addLink(r2, server, delay='5ms', bw='20')
         self.addLink(r1, r3, delay='5ms', bw='10')
         self.addLink(r2, r3, delay='5ms', bw='10')
-        self.addLink(r3, detour, delay='5ms', bw='20)
+        self.addLink(r3, detour, delay='5ms', bw='20')
 
 
 topos = {'detour': DetourTopo}
