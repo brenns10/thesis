@@ -1,3 +1,5 @@
+#!/usr/bin/env python2
+# -*- coding: utf-8 -*-
 """Custom topology example
 
 No switches, only hosts and routers connected in the following topology:
@@ -50,7 +52,12 @@ def clear_routes(*nodes):
         node.cmd('ip route flush table main')
 
 
-def main():
+def DetourNet():
+    """A function that looks like a class... ಠ_ಠ.
+
+    This function returns a *started* mininet instance, containing the detour
+    topology, fully initialized with all IP addresses and routing tables.
+    """
     topo = DetourTopo()
     mn = Mininet(topo=topo, link=TCLink)
     mn.start()
@@ -110,6 +117,10 @@ def main():
     r2.cmd('sysctl -w net.ipv4.ip_forward=1')
     r3.cmd('sysctl -w net.ipv4.ip_forward=1')
 
+    return mn
+
+def main():
+    mn = DetourNet()
     CLI(mn)
     mn.stop()
 
