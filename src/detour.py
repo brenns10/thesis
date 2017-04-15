@@ -59,7 +59,7 @@ def ip_for(address):
     # interface will get us to `address`. We can find that address from
     # getsockname() after the fact. Kinda clever, in my opinion.
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    s.connect((address, 53))  # I chose DNS well-known port, but it doesn't matter
+    s.connect((address, 53))
     addr = s.getsockname()[0]
     s.close()
     return addr
