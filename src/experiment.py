@@ -35,7 +35,7 @@ from mininet.util import waitListening
 
 BASIC_PARAMS = {
     'client_r1': {'delay': '5ms', 'bw': 20},
-'r1_r2': {'delay': '5ms', 'bw': 10},
+    'r1_r2': {'delay': '5ms', 'bw': 10},
     'r2_server': {'delay': '5ms', 'bw': 20},
     'r1_r3': {'delay': '5ms', 'bw': 20},
     'r2_r3': {'delay': '5ms', 'bw': 20},
@@ -212,7 +212,10 @@ def lossy():
 
 def main():
     if len(sys.argv) > 1:
-        mn = DetourNet(BASIC_PARAMS)
+        params = {}
+        params.update(BASIC_PARAMS)
+        params['r1_r2']['loss'] = 1
+        mn = DetourNet(params)
         CLI(mn)
         mn.stop()
     else:
