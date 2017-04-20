@@ -524,14 +524,15 @@ struct vpn_manager *detour_launch_openvpn(struct daemon_config *dc,
 {
 	pid_t pid;
 	struct vpn_manager *mgr;
+	#define KEYPATH "../tmp/"
 	const char *openvpn_args[] = {
 		"openvpn",
 		"--remote", NULL, /* only add/modify args below this one! */
 		"--client",
 		"--dev", "tun",
-		"--ca", "ca.crt",
-		"--cert", "client1.crt",
-		"--key", "client1.key",
+		"--ca", KEYPATH "ca.crt",
+		"--cert", KEYPATH "client1.crt",
+		"--key", KEYPATH "client1.key",
 		"--topology", "p2p",
 		"--pull",
 		"--nobind",
