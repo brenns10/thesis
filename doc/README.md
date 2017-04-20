@@ -13,7 +13,9 @@ Setup
 - [KERNEL.md](KERNEL.md)
   (Notes and instructions for kernel build configuration)
 - [MININET.md](MININET.md)
-  Rantings and information about Mininet
+  (Rantings and information about Mininet)
+- [VM.md](VM.md)
+  (Process for installing custom kernel on Mininet VM)
 
 Code Documentation
 ------------------
