@@ -12,6 +12,7 @@
 #include <stdbool.h>
 #include <stdarg.h>
 #include <errno.h>
+#include <time.h>
 
 #include <unistd.h>
 #include <signal.h>
@@ -144,9 +145,17 @@ struct daemon_config {
 void _dc_log(struct daemon_config *dc, int level, const char *format, ...)
 {
 	va_list va;
+	char timebuf[256];
+	time_t t;
+	struct tm *tm;
 
 	if (level > dc->loglevel)
 		return;
+
+	t = time(NULL);
+	tm = localtime(&t);
+	strftime(timebuf, sizeof(timebuf), "%F %T", tm);
+	fprintf(dc->logfile, "%s ", timebuf);
 
 	va_start(va, format);
 	vfprintf(dc->logfile, format, va);
@@ -714,6 +723,8 @@ struct daemon_config *parse_config(char *filename)
 		dc->loglevel = indexof(levels, nelem(levels), level);
 		dc->loglevel = dc->loglevel < 0 ? LEVEL_DEFAULT : dc->loglevel;
 	}
+
+	pr_info(dc, "logging initialized\n");
 
 	/* daemonize now! */
 	if (dc->daemonize)
