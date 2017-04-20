@@ -13,6 +13,7 @@ No switches, only hosts and routers connected in the following topology:
 """
 
 from mininet.cli import CLI
+from mininet.log import lg, LEVELS
 from mininet.net import Mininet
 from mininet.topo import Topo
 from mininet.link import TCLink
@@ -120,6 +121,7 @@ def DetourNet():
     return mn
 
 def main():
+    # lg.setLogLevel('debug')
     mn = DetourNet()
     CLI(mn)
     mn.stop()
