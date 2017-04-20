@@ -20,18 +20,32 @@ Throughput statistics are saved, and for at least one iteration, a tcpdump
 containing only headers is created for future inspection.
 
 """
+from __future__ import print_function
+
+import sys
 
 from mininet.cli import CLI
 from mininet.log import lg, LEVELS
 from mininet.net import Mininet
 from mininet.topo import Topo
 from mininet.link import TCLink
+from mininet.util import waitListening
+
+
+BASIC_PARAMS = {
+    'client_r1': {'delay': '5ms', 'bw': 20},
+'r1_r2': {'delay': '5ms', 'bw': 10},
+    'r2_server': {'delay': '5ms', 'bw': 20},
+    'r1_r3': {'delay': '5ms', 'bw': 20},
+    'r2_r3': {'delay': '5ms', 'bw': 20},
+    'r3_detour': {'delay': '5ms', 'bw': 20},
+}
 
 
 class DetourTopo(Topo):
     "Simple topology example."
 
-    def __init__(self):
+    def __init__(self, params):
         "Create custom topo."
 
         # Initialize topology
@@ -46,12 +60,12 @@ class DetourTopo(Topo):
         detour = self.addHost('detour')
 
         # Add links
-        self.addLink(client, r1, delay='5ms', bw=20)
-        self.addLink(r1, r2, delay='5ms', bw=10)
-        self.addLink(r2, server, delay='5ms', bw=20)
-        self.addLink(r1, r3, delay='5ms', bw=10)
-        self.addLink(r2, r3, delay='5ms', bw=10)
-        self.addLink(r3, detour, delay='5ms', bw=20)
+        self.addLink(client, r1, **params.get('client_r1', {}))
+        self.addLink(r1, r2, **params.get('r1_r2', {}))
+        self.addLink(r2, server, **params.get('r2_server', {}))
+        self.addLink(r1, r3, **params.get('r1_r3', {}))
+        self.addLink(r2, r3, **params.get('r2_r3', {}))
+        self.addLink(r3, detour, **params.get('r3_detour', {}))
 
 
 topos = {'detour': DetourTopo}
@@ -62,13 +76,13 @@ def clear_routes(*nodes):
         node.cmd('ip route flush table main')
 
 
-def DetourNet():
+def DetourNet(params):
     """A function that looks like a class... ಠ_ಠ.
 
     This function returns a *started* mininet instance, containing the detour
     topology, fully initialized with all IP addresses and routing tables.
     """
-    topo = DetourTopo()
+    topo = DetourTopo(params)
     mn = Mininet(topo=topo, link=TCLink)
     mn.start()
     client, server, detour = mn.get('client', 'server', 'detour')
@@ -129,11 +143,67 @@ def DetourNet():
 
     return mn
 
-def main():
-    # lg.setLogLevel('debug')
-    mn = DetourNet()
-    CLI(mn)
+
+def setup_nat(client, detour):
+    client.cmd('./client daemon ../etc/daemon-nat-vm.conf')
+    detour.cmd('python nat_detour.py &')
+
+
+def setup_vpn(client, detour):
+    client.cmd('./client daemon ../etc/daemon-vpn-vm.conf')
+    detour.cmd('./vpn_detour.sh &')
+
+
+def setup_ctrl(client, detour):
+    pass
+
+
+SETUP = {
+    'nat': setup_nat,
+    'vpn': setup_vpn,
+    'control': setup_ctrl,
+}
+
+
+def scenario(name, params, trials=30):
+    mn = DetourNet(params)
+    client, detour, server = mn.get('client', 'detour', 'server')
+    SETUP[params['scenario']](client, detour)
+
+    filename = '%s.%s.csv' % (name, params['scenario'])
+    server.sendCmd('iperf -s -y c > %s' % filename)
+
+    # sleep synchronization is the worst, except for iperf
+    import time; time.sleep(0.5)
+
+    for _ in range(trials):
+        print('.', end='')
+        sys.stdout.flush()
+        client.cmd('iperf -c ' + server.IP() + ' -y c')
+
+        # ಠ_ಠ
+        time.sleep(0.5)
+    print()
+
     mn.stop()
+
+
+def easy():
+    for name in SETUP:
+        print('Scenario %s: ' % name, end='')
+        sys.stdout.flush()
+        params = {'scenario': name}
+        params.update(BASIC_PARAMS)
+        scenario('easy', params)
+
+
+def main():
+    if len(sys.argv) > 1:
+        mn = DetourNet(BASIC_PARAMS)
+        CLI(mn)
+        mn.stop()
+    else:
+        easy()
 
 
 if __name__ == '__main__':
