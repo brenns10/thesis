@@ -22,6 +22,7 @@ containing only headers is created for future inspection.
 """
 from __future__ import print_function
 
+import os
 import sys
 
 from mininet.cli import CLI
@@ -195,6 +196,18 @@ def easy():
         params = {'scenario': name}
         params.update(BASIC_PARAMS)
         scenario('easy', params)
+    os.system('dmesg > dmesg.easy.log')
+
+
+def lossy():
+    for name in SETUP:
+        print('Scenario %s: ' % name, end='')
+        sys.stdout.flush()
+        params = {'scenario': name}
+        params.update(BASIC_PARAMS)
+        params['r1_r2']['loss'] = 1
+        scenario('lossy', params)
+    os.system('dmesg > dmesg.lossy.log')
 
 
 def main():
@@ -203,7 +216,7 @@ def main():
         CLI(mn)
         mn.stop()
     else:
-        easy()
+        lossy()
 
 
 if __name__ == '__main__':
