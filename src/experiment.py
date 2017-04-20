@@ -183,7 +183,7 @@ def scenario(name, params, trials=30):
         client.cmd('iperf -c ' + server.IP() + ' -y c')
 
         # ಠ_ಠ
-        time.sleep(0.5)
+        time.sleep(1)
     print()
 
     mn.stop()
