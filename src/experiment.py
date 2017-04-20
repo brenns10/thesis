@@ -1,14 +1,23 @@
 #!/usr/bin/env python2
 # -*- coding: utf-8 -*-
-"""Custom topology example
+"""Mininet detour experiment.
 
-No switches, only hosts and routers connected in the following topology:
+This script contains several important items. First, it contains a class
+declaring my experimental network topology. Second, a function that defines
+routes and anything else required to make this topology work. You can see a
+diagram of the topology below:
 
     client --- r1 ---------------------- r2 --- server
                 \                        /
                  ---------  r3  ---------
                             |
                           detour
+
+Finally, this script contains my experiment and data collection mechanisms.
+Simply put, for each set of experimental parameters, we create a Mininet, start
+all necessary detour and client processes, and then run iperf several times.
+Throughput statistics are saved, and for at least one iteration, a tcpdump
+containing only headers is created for future inspection.
 
 """
 

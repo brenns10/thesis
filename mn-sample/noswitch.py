@@ -2,6 +2,10 @@
 
     h1  ---  s2  ---  h3  --- s4  ---  h5
 
+NB this is not very related to the thesis. It was just a stepping stone for
+figuring out how to create functioning mininet topologies that have no
+switches, which are capable of routing.
+
 """
 
 from mininet.cli import CLI
