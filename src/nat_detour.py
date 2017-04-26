@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """
 Proxy daemon which configures NAT mappings within the kernel.
 
