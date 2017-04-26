@@ -255,11 +255,11 @@ Generic Netlink type allows any kernel component to define its own protocol,
 while still managing marshalling data.
 
 Our protocol is similar to the UDP protocol for communication between the client
-and detour. The kernel sends a message of type \texttt{DETOUR_C_REQ} to a
+and detour. The kernel sends a message of type \texttt{DETOUR\_C\_REQ} to a
 ``multicast group'' which the client daemon subscribes to. This message contains
 the necessary parameters (remote address, remote port). The client daemon may
-reply to the kernel with \texttt{DETOUR_C_ADD} commands, which add detour
-entries, and \texttt{DETOUR_C_DEL} commands, which remove them.
+reply to the kernel with \texttt{DETOUR\_C\_ADD} commands, which add detour
+entries, and \texttt{DETOUR\_C\_DEL} commands, which remove them.
 
 The protocol allows the client to register both OpenVPN and NAT based detours,
 both of which are supported in the kernel implementation.
@@ -281,14 +281,14 @@ Netlink socket, requesting a detour. Then, the task looks through an internal
 list of detours. The kernel maintains two lists of detours. The first is a list
 of OpenVPN detours. These detours are not specific to the remote port and host.
 The second list contains NAT tunnels which were created by the client daemon and
-sent to the kernel via the \texttt{DETOUR_C_ADD} command.
+sent to the kernel via the \texttt{DETOUR\_C\_ADD} command.
 
 The task attempts to add up to $N$ subflows, where $N$ is a configurable limit.
 If it cannot (due to lack of subflows), it terminates. If OpenVPN detours are
 available, then they take precedence over the NAT detours, because they are
 available immediately.
 
-When the client receives a \texttt{DETOUR_C_ADD} command, it first adds the
+When the client receives a \texttt{DETOUR\_C\_ADD} command, it first adds the
 details of the tunnel to its internal list. Then, if the tunnel was a NAT
 tunnel, it wakes all the path managers so that they can attempt to create a
 subflow through that tunnel.
