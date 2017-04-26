@@ -147,7 +147,7 @@ def DetourNet(params):
 
 def setup_nat(client, detour):
     client.cmd('./client daemon ../etc/daemon-nat-vm.conf')
-    detour.cmd('python nat_detour.py &')
+    detour.cmd('./nat_detour.py &')
 
 
 def setup_vpn(client, detour):
