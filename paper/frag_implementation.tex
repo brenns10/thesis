@@ -9,31 +9,62 @@
 
 % smoother transition once we have everything
 
-The implementation of this project is based on the following expectations.
-First, the server must support Multipath TCP. However, beyond this, no other
-modifications should be required of the server. Second, the client and detour
-point are assumed to be ``active'' participants in the collective, and so they
-may run whatever software is necessary to participate.
+In this project, we implement a system which allows one host to dynamically add
+new overlay routes to a Multipath TCP connection. Each overlay route is a new
+subflow, which is tunneled across a third-party host. The system involves at
+least three hosts:
+\begin{itemize}
+\item The \emph{client} is the host which adds detour routes, attempting to
+  improve its connection quality. The client must be the host which initiates
+  the MPTCP connection.
+\item The \emph{server} is the host with which the client wishes to communicate.
+\item The \emph{detour} is a host which acts as a waypoint along the overlay
+  route from the client to the server. It tunnels the MPTCP between them. There
+  may be more than one detour at a time.
+\end{itemize}
 
-The client must run a modified kernel, which supports creating MPTCP subflows
-across detours. In addition, the client must also run a daemon which discovers
-and negotiates with detour points, finally reporting available ones to the
-kernel. These concerns remain separate for several reasons. First, communication
-with detour points requires communication over the Internet. While it is
-possible to do user-level networking within the kernel, it is much simpler and
-more future-proof to use the userspace socket API. Second, one type of detour
-requires starting an OpenVPN process, an operation which should only be done
-from userspace. Finally, userspace tools may be more easily configured and can
-perform a more broad spectrum of computations, such as floating point math.
+We assume only that the server supports Multipath TCP, and require no additional
+customization for our system to work. In our current implementation, the detour
+host must run some version of Linux, and the client must run a custom version of
+Linux.
 
-The detour need not support Multipath TCP. However, it must run one of two
-possible daemons, depending on which type of detour it will be hosting.
+The system is implemented via a number of interacting components. First, a path
+manager extension for the Linux MPTCP implementation, which allows the client's
+kernel to request new detour paths, receive them, and create subflows across
+them. Second, a user-space utility which receives messages from the kernel and
+creates the necessary detour paths. Finally, we implement two different types of
+detour daemons, which run on the detour host. These components are illustrated
+in Figure~\ref{f:MovingParts}.
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=\textwidth]{figures/MovingParts.pdf}
+  \caption{
+    The components and their communications. In \textbf{A}, the path manager
+    requests an overlay route. In \textbf{B}, the client daemon reports overlay
+    routes back to the path managers. In \textbf{C} and \textbf{D}, the client
+    and detour daemons negotiate an overlay route. In \textbf{E}, a subflow is
+    created through the detour.
+  }
+  \label{f:MovingParts}
+\end{figure}
+
+The typical interaction of these components is as follows. First, the client
+creates a MPTCP connection to the server. The first subflow uses the Internet
+routed path. Once this connection is fully established, the path manager
+requests overlay routes on which it may create subflows. The client and detour
+daemons negotiate a tunnel, which may be implemented in two different ways. The
+client reports this to the path-managers, which creates subflows for the MPTCP
+connection across every available detour, until a predefined limit is reached.
+
+In the remainder of this section, we will discuss each of these components at
+length.
 
 \subsection{Detour Daemon}
 
-In this project, we implement two different mechanisms for tunneling MPTCP
-subflows across a detour. In both cases, the detour host must run a daemon that
-assists in tunneling traffic from the client to the server.
+We have implemented two different mechanisms for tunneling MPTCP subflows across
+a detour. In both cases, the detour host must run a daemon that assists in
+tunneling traffic from the client to the server.
 
 \subsubsection{OpenVPN Tunneling}
 
@@ -50,12 +81,9 @@ The VPN connection is configured as follows:
   caused by two congestion control algorithms interfering with each other.
   % TODO citation
 \item The initial connection negotiation requires the client and server to
-  exchange certificates. OpenVPN allows the user to specify the PKI root. A
-  centralized detour management system could authorize clients and servers by
-  signing certificates, enabling tunneling for members and preventing it for
-  non-members.
+  exchange certificates.
 \item Subsequent messages are not protected by encryption or signatures, to
-  avoid the computational overhead.
+  avoid overhead.
 \end{itemize}
 
 One important aspect of VPN configuration is that the detour must create a
@@ -87,7 +115,8 @@ on a per-connection basis. Finally, it provides a built in mechanism for
 mutually authenticating the client and detour. However, there are some
 drawbacks. Since packets are tunneled, at least 28 bytes of overhead (IP and UDP
 headers) are required. To avoid fragmentation, the connection's maximum segment
-size (MSS) must be adjusted.
+size (MSS) may need to be adjusted, although in our testing, this was not
+required.
 
 \subsubsection{NAT Tunneling}
 
@@ -100,7 +129,7 @@ the detour must have advance knowledge of the final destination of the packet.
 So, clients use a simple signaling protocol to request tunnels via a detour.
 
 The Linux kernel's Netfilter framework allows for two types of NAT. The first
-kind is source NAT, or SNAT, rewrites the source address of the packet. This is
+kind, source NAT (SNAT), rewrites the source address of the packet. This is
 the typical form of NAT used by home routers: the source address of an outgoing
 connection is rewritten to be the router's external IP address, but the
 destination is unchanged. The second kind of NAT supported by Netfilter is
@@ -220,75 +249,89 @@ connection is created on the client. While the client may simply send packets to
 a new remote through an OpenVPN tunnel, it must incur a RTT delay requesting a
 new tunnel from the NAT detour before it can begin establishing a subflow.
 
+\subsection{Path Manager}
+
+To enable subflows to use the detours created above, we implement a custom MPTCP
+path manager within the Linux kernel. The path manager is a module which
+dictates local policy for creating new subflows and announcing local addresses.
+For example, the \texttt{fullmesh} path manager creates a subflow between each
+address on the client and server.
+
+The path manager receives space within the MPTCP control buffer in order to
+track state, and it registers a set of callbacks with the protocol, so that it
+can be notified of events as they occur. Our path manager (named
+\texttt{detour}) runs a worker when a client-side MPTCP connection becomes fully
+established (i.e. after the three-way handshake completes). The first thing this
+is send a message to userspace, requesting a detour. Then, it looks through an
+internal list of detours. The kernel maintains two lists of detours (per network
+namespace). The first is a list of OpenVPN detours. These detour entries are not
+specific to a server, and they simply indicate the name of a network interface
+to use. The second list contains NAT detours. These consist of a detour address
+and port, and a server address and port. The worker may only select NAT entries
+which match the server address and port of the connection it is working on.
+
+The task attempts to add up to $N$ subflows, where $N$ is a configurable limit.
+It terminates in one of two ways. Either it has exhaused all of the available
+detours, but not yet created all $N$ subflows. Otherwise, if it creates $N$
+subflows successfully, it stops looking through the list, even if more detours
+are available. If OpenVPN detours are available, then they take precedence over
+the NAT detours, because they are available immediately. NAT detours created by
+the client daemon become available only once the daemon has processed the
+request from the kernel.
+
+The kernel listens for new detour routes. When it receives them, it adds them to
+the appropriate internal list. Then, it iterates over every MPTCP connection
+within the network namespace of the message, waking their workers to give them
+the opportunity to create a new subflow along this detour. If the detour was
+OpenVPN type, every worker notified. If the detour was NAT type, then only
+connections which match the server address and port are notified.
+
 \subsection{Client Daemon}
 
-In order for the client to use detours, it must either initiate OpenVPN
-connections with them, or dynamically request tunnels via the UDP protocol. In
-either case, a client program must manage these activities. In particular, a
-program must be able to notify the kernel when new detours are available for
-immediate use, and it must be able to respond to requests from the kernel for
-new detours. The mechanism for communication with the kernel will be discussed
-in the following section.
+The client daemon has several responsibilities. First, it must create OpenVPN
+connections report them to the kernel. Second, it must respond to detour
+requests from the kernel by creating NAT detours and reporting them back.
 
-\subsubsection{OpenVPN Client Management}
+The daemon has a configuration file which allows the user to specify the IP
+addresses of hosts to use for both types of detours. On startup, the daemon
+connects to each OpenVPN detour and reports the resulting network interfaces to
+the kernel. Then, it waits listening for detour requests from the kernel. For
+each request, it requests a detour from every NAT detour address. Upon receiving
+responses, it sends them the the kernel as well.
 
-The client daemon reads a configuration file which informs it of detours which
-use OpenVPN. On startup, it initiates an OpenVPN connection with each detour.
-Once the connections are established, it sends a message to the kernel with the
-virtual network device's name.
-
-\subsubsection{NAT Client Management}
-
-In order to use NAT tunnels, the client daemon must be much more complex. The
-client waits for kernel tunnel requests. Upon receiving these requests, it sends
-a UDP request to each NAT detour server specified in its configuration file. It
-then waits for responses from the detour servers. Upon receiving each response,
-it sends a reply back to the kernel notifying it of the new NAT tunnel.
-
-\subsection{Client Communication}
+\subsubsection{Client Communication}
 
 In order to communicate between kernel and userspace, we use Generic Netlink
 sockets. Netlink is an address family for the socket interface
-(\texttt{AF\_NETLINK}, similar to \texttt{AF\_INET}), which allows just this
-sort of communication. There are several types of Netlink socket, but the
-Generic Netlink type allows any kernel component to define its own protocol,
-while still managing marshalling data.
+(\texttt{AF\_NETLINK}, similar to \texttt{AF\_INET}), which allows communication
+between kernel and userspace. Many existing Linux network configuration
+utilities communicate with the kernel over the Netlink address family, such as
+route and firewall configuration. Each of the subsystems being configured has a
+corresponding protocol family, such as \texttt{NETLINK\_NETFILTER} for Netfilter
+firewall configuration. These protocol families take the same place in the
+\texttt{socket()} system call as protocol families such as \texttt{IPPROTO\_TCP}
+in the \texttt{AF\_INET} and \texttt{AF\_INET6} address families.
 
-Our protocol is similar to the UDP protocol for communication between the client
-and detour. The kernel sends a message of type \texttt{DETOUR\_C\_REQ} to a
-``multicast group'' which the client daemon subscribes to. This message contains
-the necessary parameters (remote address, remote port). The client daemon may
-reply to the kernel with \texttt{DETOUR\_C\_ADD} commands, which add detour
-entries, and \texttt{DETOUR\_C\_DEL} commands, which remove them.
+Creating a new Netlink protocol would involve allocating a new Netlink protocol
+family. To make this process easier, the Generic Netlink protocol family was
+created. It allows custom protocols (``Generic Netlink families'') to be
+created, dynamically allocated, and discovered. It also provides a common format
+for sending several data types, and creates a framework for defining message
+types. Further, Generic Netlink provides a multicast capability, allowing kernel
+and user sockets to broadcast messages to any socket which has joined a
+particular multicast group. Finally, Generic Netlink comes with a kernel and
+userspace library which allows for a consistent API and a level of abstraction
+when defining Generic Netlink families.
 
-The protocol allows the client to register both OpenVPN and NAT based detours,
-both of which are supported in the kernel implementation.
-
-\subsection{Client Kernel}
-
-Finally, the client kernel must be capable of requesting detours, receiving
-information from userspace, and using that information to establish subflows.
-Support for this functionality is implemented as a Linux kernel module. In
-particular, it is implemented as a MPTCP ``path manager.'' A path manager is a
-kernel module which makes decisions regarding when to advertise additional
-addresses and when to create new subflows. An instance of the path manager is
-created for each MPTCP connection, when the connection becomes fully established
-(that is, after the third packet in the handshake).
-
-Upon creation, our path manager enqueues a task to be executed in a long-running
-kernel thread. This task first sends a message to userspace on the Generic
-Netlink socket, requesting a detour. Then, the task looks through an internal
-list of detours. The kernel maintains two lists of detours. The first is a list
-of OpenVPN detours. These detours are not specific to the remote port and host.
-The second list contains NAT tunnels which were created by the client daemon and
-sent to the kernel via the \texttt{DETOUR\_C\_ADD} command.
-
-The task attempts to add up to $N$ subflows, where $N$ is a configurable limit.
-If it cannot (due to lack of subflows), it terminates. If OpenVPN detours are
-available, then they take precedence over the NAT detours, because they are
-available immediately.
-
-When the client receives a \texttt{DETOUR\_C\_ADD} command, it first adds the
-details of the tunnel to its internal list. Then, if the tunnel was a NAT
-tunnel, it wakes all the path managers so that they can attempt to create a
-subflow through that tunnel.
+To allow the kernel to request detours, and userspace to communicate the
+existence of these detours, we define a Generic Netlink family. This protocol is
+similar to the UDP protocol which the client daemon uses to request NAT tunnels.
+The kernel sends a message of type \texttt{DETOUR\_C\_REQ} to a ``multicast
+group'' which the client daemon subscribes to. This message contains the
+parameters necessary for the daemon to create a tunnel: the server address and
+port. The client daemon receives this message and creates tunnels, based on a
+configuration file. It then reports these tunnels to the kernel, using a
+\texttt{DETOUR\_C\_ADD} message type. The client daemon may also use the
+\texttt{DETOUR\_C\_DEL} message type to delete a tunnel entry it has previously
+added. Finally, the \texttt{DETOUR\_C\_ECHO} message type requests that the
+kernel log all tunnels for diagnostics.
