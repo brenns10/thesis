@@ -24,6 +24,7 @@ from __future__ import print_function
 
 import argparse
 import os
+import re
 import subprocess
 import sys
 import time
@@ -190,10 +191,27 @@ def setup_vpn(net):
     if is_custom_kernel():
         client.cmd('./client daemon ../etc/daemon-vpn-vm.conf')
     else:
-        client.cmd('openvpn --remote %s --client --dev tun --ca ../tmp/ca.crt '
-                   '--cert ../tmp/client1.crt --key ../tmp/client1.key '
-                   '--topology p2p --pull --nobind' % detour.IP())
-        return 'iperf3 -c ' + server.IP() + ' -J -B 10.8.0.4'
+        client.cmd('openvpn --remote %s 1194 udp --client --dev tun '
+                   '--ca ../tmp/ca.crt --cert ../tmp/client1.crt '
+                   '--key ../tmp/client1.key ' '--topology p2p --pull '
+                   '--nobind &' % detour.IP())
+
+        # We need to wait until the openvpn interface is up. This will also
+        # give us the peer IP address, which we already configured, but it's
+        # always better to dynamically determine.
+        output = client.monitor()
+        regexp = re.compile(r'ip addr add dev tun0 local ([0-9.]+) peer ([0-9.]+)')
+        while not regexp.search(output):
+            output += client.monitor()
+        match = regexp.search(output)
+        local, peer = match.groups()
+        # For some reason even after openvpn says the interface is up, we need
+        # to keep waiting a bit longer before we can use it as a route gateway.
+        time.sleep(0.5)
+        # We have to add a very specific routing rule here so that the iperf
+        # traffic goes through OpenVPN. This is, unfortunately, necessary since
+        # the iperf3 -B option does not seem to work in this case.
+        client.cmd('route add -host %s gw %s' % (server.IP(), peer))
 
 
 def setup_ctrl(net):
