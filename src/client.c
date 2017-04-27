@@ -21,6 +21,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <regex.h>
+#include <pthread.h>
 
 #include <libconfig.h>
 #include <netlink/netlink.h>
@@ -36,6 +37,18 @@ void abort_perror(char *msg)
 {
 	perror(msg);
 	abort();
+}
+
+void pthread_mutex_lock_s(pthread_mutex_t *mutex)
+{
+	if (pthread_mutex_lock(mutex) != 0)
+		abort_perror("pthread_mutex_lock");
+}
+
+void pthread_mutex_unlock_s(pthread_mutex_t *mutex)
+{
+	if (pthread_mutex_unlock(mutex) != 0)
+		abort_perror("pthread_mutex_unlock");
 }
 
 /**
@@ -97,6 +110,8 @@ char *levels[] = {
 	"DEFAULT",
 };
 
+struct daemon_config;
+
 /**
  * A struct for tracking running VPN processes.
  * @next: linked list
@@ -109,6 +124,10 @@ struct vpn_manager {
 	pid_t openvpn_pid; /* only valid in the parent, obviously */
 	int fildes[2];
 	char ifname[IFNAMSIZ];
+	struct daemon_config *dc; // so we can log
+	pthread_t thread;
+	int id;
+	FILE *stdout;
 };
 
 /**
@@ -132,6 +151,10 @@ struct detour_manager {
  * @vpns: list of vpns
  * @detours: list of detours
  * @sk: netlink socket we listen on
+ * @logfile: where to write log entries
+ * @daemonize: whether or not to fork a new process first
+ * @loglevel: filters log entries
+ * @log_lock: held by _dc_log function to avoid concurrency. problems caused by
  */
 struct daemon_config {
 	struct vpn_manager *vpns;
@@ -140,6 +163,7 @@ struct daemon_config {
 	FILE *logfile;
 	int daemonize;
 	int loglevel;
+	pthread_mutex_t log_lock;
 };
 
 void _dc_log(struct daemon_config *dc, int level, const char *format, ...)
@@ -152,6 +176,7 @@ void _dc_log(struct daemon_config *dc, int level, const char *format, ...)
 	if (level > dc->loglevel)
 		return;
 
+	pthread_mutex_lock_s(&dc->log_lock);
 	t = time(NULL);
 	tm = localtime(&t);
 	strftime(timebuf, sizeof(timebuf), "%F %T", tm);
@@ -161,6 +186,7 @@ void _dc_log(struct daemon_config *dc, int level, const char *format, ...)
 	vfprintf(dc->logfile, format, va);
 	va_end(va);
 	fflush(dc->logfile); // yolo
+	pthread_mutex_unlock_s(&dc->log_lock);
 }
 
 #define dc_log(dc,level,format, ...) \
@@ -464,6 +490,29 @@ int recv_responses(struct daemon_config *dc)
 	return 0;
 }
 
+/**
+ * A pthread that simply reads OpenVPN output and logs it. It will also call
+ * wait() once the process ends, like a good parent should.
+ */
+void *vpn_monitor_thread(void *arg)
+{
+	char buf[512];
+	struct vpn_manager *mgr = arg;
+	struct daemon_config *dc = mgr->dc;
+	int stat;
+	while (true) {
+		if (!fgets(buf, sizeof(buf), mgr->stdout)) {
+			// EOF -> we need to wait and then terminate
+			if (feof(mgr->stdout))
+				break;
+			// otherwise -> error
+			abort_perror("fgets");
+		}
+		pr_debug(dc, "VPN%d: %s", mgr->id, buf);
+	}
+	waitpid(mgr->openvpn_pid, &stat, 0); // hopefully that does the trick
+	return NULL;
+}
 
 /**
  * Wait for OpenVPN to initialize itself. We do this by reading lines from its
@@ -489,11 +538,13 @@ void wait_for_openvpn(struct daemon_config *dc, struct vpn_manager *mgr)
 		abort_perror("in regcomp(if_str)");
 	if (regcomp(&comp_re, comp_str, REG_EXTENDED))
 		abort_perror("in regcomp(comp_str)");
+	mgr->stdout = openvpn;
 
 	if (dc) pr_info(dc, "waiting for device name...\n");
 	while (true) {
 		if (!fgets(buf, sizeof(buf), openvpn))
 			abort_perror("fgets1");
+		if (dc) pr_debug(dc, "VPN%d: %s", mgr->id, buf);
 		if (!regexec(&if_re, buf, nelem(matches), matches, 0)) {
 			int len = matches[1].rm_eo - matches[1].rm_so;
 			len = len < IFNAMSIZ-1 ? len : (IFNAMSIZ-1);
@@ -507,6 +558,7 @@ void wait_for_openvpn(struct daemon_config *dc, struct vpn_manager *mgr)
 	while (true) {
 		if (!fgets(buf, sizeof(buf), openvpn))
 			abort_perror("fgets2");
+		if (dc) pr_debug(dc, "VPN%d: %s", mgr->id, buf);
 		if (!regexec(&comp_re, buf, nelem(matches), matches, 0)) {
 			break;
 		}
@@ -520,7 +572,7 @@ void wait_for_openvpn(struct daemon_config *dc, struct vpn_manager *mgr)
  * @returns A pointer to the filled out struct vpn_manager
  */
 struct vpn_manager *detour_launch_openvpn(struct daemon_config *dc,
-                                          const char *addr)
+                                          const char *addr, int id)
 {
 	pid_t pid;
 	struct vpn_manager *mgr;
@@ -541,7 +593,9 @@ struct vpn_manager *detour_launch_openvpn(struct daemon_config *dc,
 	openvpn_args[2] = addr;
 
 	mgr = malloc(sizeof(struct vpn_manager));
+	mgr->dc = dc;
 	mgr->next = NULL;
+	mgr->id = id;
 	if (pipe(mgr->fildes) == -1) {
 		if (dc) pr_perror(dc, "error in pipe()");
 		free(mgr);
@@ -570,6 +624,7 @@ struct vpn_manager *detour_launch_openvpn(struct daemon_config *dc,
 		/* parent */
 		mgr->openvpn_pid = pid;
 		wait_for_openvpn(dc, mgr);
+		pthread_create(&mgr->thread, NULL, vpn_monitor_thread, (void*)mgr);
 		return mgr;
 	}
 }
@@ -707,6 +762,7 @@ struct daemon_config *parse_config(char *filename)
 	}
 
 	/* init logging config */
+	pthread_mutex_init(&dc->log_lock, NULL);
 	dc->daemonize = false;
 	dc->logfile = stdout;
 	dc->loglevel = LEVEL_DEFAULT;
@@ -767,7 +823,7 @@ struct daemon_config *parse_config(char *filename)
 			fprintf(stderr, "vpns must be strings\n");
 			goto destroy_vpns;
 		}
-		vmgr = detour_launch_openvpn(dc, ip);
+		vmgr = detour_launch_openvpn(dc, ip, i);
 		if (!vmgr)
 			goto destroy_vpns;
 		vmgr->next = dc->vpns;
@@ -810,6 +866,8 @@ int report_vpns(struct daemon_config *dc)
 /** Call DETOUR_C_ECHO, either using CLI provided string or a default. */
 int cli_echo(struct nl_sock *sk, int argc, char *argv[])
 {
+	(void)argc;
+	(void)argv;
 	return detour_echo(sk);
 }
 
@@ -932,7 +990,7 @@ int cli_vpn(struct nl_sock *sk, int argc, char *argv[])
 		return -1;
 	}
 	struct daemon_config cfg;
-	cfg.vpns = detour_launch_openvpn(NULL, argv[2]);
+	cfg.vpns = detour_launch_openvpn(NULL, argv[2], 0);
 	cfg.vpns->next = NULL;
 	cfg.sk = sk;
 	printf("vpn: %s\n", cfg.vpns->ifname);
@@ -975,12 +1033,16 @@ char *cmd_helps[] = {
 
 int cli_help(struct nl_sock* sk, int argc, char *argv[])
 {
+	(void)sk;
+	(void)argc;
+	(void)argv;
 	printf("Usage: %s SUBCOMMAND [ARGS...]\n", argv[0]);
 	printf("Runs utilities related to MPTCP detour clients.\n\n");
 	printf("Subcommands:\n");
-	for (int i = 0; i < nelem(cmd_names); i++) {
-		printf("  % 8s\t%s\n", cmd_names[i], cmd_helps[i]);
+	for (unsigned int i = 0; i < nelem(cmd_names); i++) {
+		printf("  %8s\t%s\n", cmd_names[i], cmd_helps[i]);
 	}
+	return 0;
 }
 
 /**
