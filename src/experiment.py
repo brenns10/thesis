@@ -77,6 +77,17 @@ def clear_routes(*nodes):
         node.cmd('ip route flush table main')
 
 
+def disable_rp_filter(node):
+    # all -> used in computing the iface value. Be sure to set to 0
+    node.cmd('sysctl -w net.ipv4.conf.all.rp_filter=0')
+    # default -> used as value for new ifaces. Be sure to set to 0
+    node.cmd('sysctl -w net.ipv4.conf.default.rp_filter=0')
+    # lo -> jsut to be sure
+    node.cmd('sysctl -w net.ipv4.lo.default.rp_filter=0')
+    for name in node.nameToIntf:
+        node.cmd('sysctl -w net.ipv4.conf.%s.rp_filter=0' % name)
+
+
 def DetourNet(params):
     """A function that looks like a class... ಠ_ಠ.
 
@@ -141,6 +152,14 @@ def DetourNet(params):
     r1.cmd('sysctl -w net.ipv4.ip_forward=1')
     r2.cmd('sysctl -w net.ipv4.ip_forward=1')
     r3.cmd('sysctl -w net.ipv4.ip_forward=1')
+
+    ### CUT ME SOME ROUTING SLACK PLEASE
+    disable_rp_filter(r1)
+    disable_rp_filter(r2)
+    disable_rp_filter(r3)
+    disable_rp_filter(client)
+    disable_rp_filter(detour)
+    disable_rp_filter(server)
 
     return mn
 
