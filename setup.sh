@@ -3,7 +3,7 @@
 
 sudo dpkg -i tmp/*.deb
 
-sudo apt install -y python3-pip libnl-genl-3-dev openvpn
+sudo apt install -y python3-pip libnl-genl-3-dev openvpn iperf3
 sudo pip3 install psutil
 
 # Compile everything freshly on VM.
