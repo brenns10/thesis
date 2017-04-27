@@ -4,7 +4,6 @@ rm -f vm.tar
 tar cf vm.tar \
 	src/* \
 	etc/* \
-	tmp/linux-firmware-image.deb \
-	tmp/linux-image.deb \
+	tmp/* \
 	setup.sh
 echo Package created!

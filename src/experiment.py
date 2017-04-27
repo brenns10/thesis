@@ -191,7 +191,7 @@ def scenario(name, params, trials=30):
     SETUP[params['scenario']](client, detour)
 
     filename = '%s.%s.json' % (name, params['scenario'])
-    server.sendCmd('iperf3 -s -J | tee %s' % filename)
+    server.sendCmd('iperf3 -s -J > %s' % filename)
 
     # sleep synchronization is the worst, except for iperf
     import time; time.sleep(0.5)
@@ -199,8 +199,10 @@ def scenario(name, params, trials=30):
     for _ in range(trials):
         print('.', end='')
         sys.stdout.flush()
-        client.cmd('iperf3 -c ' + server.IP())
+        client.cmd('iperf3 -c ' + server.IP() + ' -J')
+        time.sleep(0.5)
     print()
+    time.sleep(0.5)
 
     mn.stop()
 
