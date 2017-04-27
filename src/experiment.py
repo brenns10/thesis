@@ -41,8 +41,8 @@ BASIC_PARAMS = {
     'client_r1': {'delay': '5ms', 'bw': 20},
     'r1_r2': {'delay': '5ms', 'bw': 10},
     'r2_server': {'delay': '5ms', 'bw': 20},
-    'r1_r3': {'delay': '5ms', 'bw': 20},
-    'r2_r3': {'delay': '5ms', 'bw': 20},
+    'r1_r3': {'delay': '5ms', 'bw': 10},
+    'r2_r3': {'delay': '5ms', 'bw': 10},
     'r3_detour': {'delay': '5ms', 'bw': 20},
 }
 
