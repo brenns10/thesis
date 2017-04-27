@@ -242,7 +242,7 @@ def scenario(setup_name, params_name, trials=30):
         print('.', end='')
         sys.stdout.flush()
         if iperf_cmd:
-            print(client.cmd(iperf_cmd))
+            client.cmd(iperf_cmd)
         else:
             client.cmd('iperf3 -c ' + server.IP() + ' -J')
         time.sleep(0.5)
