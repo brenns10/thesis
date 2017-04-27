@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """
 Send requests to the mproxy daemon. Must run from client.
 

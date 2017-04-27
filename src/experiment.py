@@ -22,8 +22,11 @@ containing only headers is created for future inspection.
 """
 from __future__ import print_function
 
+import argparse
 import os
+import subprocess
 import sys
+import time
 
 from mininet.cli import CLI
 from mininet.log import lg, LEVELS
@@ -164,17 +167,36 @@ def DetourNet(params):
     return mn
 
 
-def setup_nat(client, detour):
-    client.cmd('./client daemon ../etc/daemon-nat-vm.conf')
+def is_custom_kernel():
+    output = subprocess.check_output(['dmesg'])
+    return 'mptcp' in output and 'detour' in output
+
+
+def setup_nat(net):
+    client, detour, server = net.get('client', 'detour', 'server')
     detour.cmd('./nat_detour.py &')
+    if is_custom_kernel():
+        client.cmd('./client daemon ../etc/daemon-nat-vm.conf')
+    else:
+        time.sleep(0.5)
+        client.cmd('./request.py %s %s %d %d' % (detour.IP(), server.IP(),
+                                                 5201, 5201))
+        return 'iperf3 -c ' + detour.IP() + ' -J'
 
 
-def setup_vpn(client, detour):
-    client.cmd('./client daemon ../etc/daemon-vpn-vm.conf')
+def setup_vpn(net):
+    client, detour, server = net.get('client', 'detour', 'server')
     detour.cmd('./vpn_detour.sh &')
+    if is_custom_kernel():
+        client.cmd('./client daemon ../etc/daemon-vpn-vm.conf')
+    else:
+        client.cmd('openvpn --remote %s --client --dev tun --ca ../tmp/ca.crt '
+                   '--cert ../tmp/client1.crt --key ../tmp/client1.key '
+                   '--topology p2p --pull --nobind' % detour.IP())
+        return 'iperf3 -c ' + server.IP() + ' -J -B 10.8.0.4'
 
 
-def setup_ctrl(client, detour):
+def setup_ctrl(net):
     pass
 
 
@@ -185,57 +207,76 @@ SETUP = {
 }
 
 
-def scenario(name, params, trials=30):
-    mn = DetourNet(params)
-    client, detour, server = mn.get('client', 'detour', 'server')
-    SETUP[params['scenario']](client, detour)
+def params_easy():
+    return BASIC_PARAMS.copy()
 
-    filename = '%s.%s.json' % (name, params['scenario'])
+
+def params_lossy():
+    d = BASIC_PARAMS.copy()
+    d['r1_r2']['loss'] = 1
+    return d
+
+
+PARAMS = {
+    'easy': params_easy,
+    'lossy': params_lossy,
+}
+
+
+def scenario(setup_name, params_name, trials=30):
+    params = PARAMS[params_name]()
+    mn = DetourNet(params)
+    iperf_cmd = SETUP[setup_name](mn)
+    name = 'mptcp' if is_custom_kernel() else 'vanilla'
+
+    client, detour, server = mn.get('client', 'detour', 'server')
+
+    filename = '%s.%s.%s.json' % (params_name, setup_name, name)
     server.sendCmd('iperf3 -s -J > %s' % filename)
+    print(filename + ': ', end='')
 
     # sleep synchronization is the worst, except for iperf
-    import time; time.sleep(0.5)
+    time.sleep(0.5)
 
     for _ in range(trials):
         print('.', end='')
         sys.stdout.flush()
-        client.cmd('iperf3 -c ' + server.IP() + ' -J')
+        if iperf_cmd:
+            print(client.cmd(iperf_cmd))
+        else:
+            client.cmd('iperf3 -c ' + server.IP() + ' -J')
         time.sleep(0.5)
+
     print()
     time.sleep(0.5)
 
     mn.stop()
-
-
-def easy():
-    for name in SETUP:
-        print('Scenario %s: ' % name, end='')
-        params = {'scenario': name}
-        params.update(BASIC_PARAMS)
-        scenario('easy', params)
-    os.system('dmesg > dmesg.easy.log')
-
-
-def lossy():
-    for name in SETUP:
-        print('Scenario %s: ' % name, end='')
-        params = {'scenario': name}
-        params.update(BASIC_PARAMS)
-        params['r1_r2']['loss'] = 1
-        scenario('lossy', params)
-    os.system('dmesg > dmesg.lossy.log')
+    os.system('dmesg > dmesg.%s.log' % params_name)
 
 
 def main():
-    if len(sys.argv) > 1:
-        params = {}
-        params.update(BASIC_PARAMS)
-        params['r1_r2']['loss'] = 1
-        mn = DetourNet(params)
+    parser = argparse.ArgumentParser(description='Mininet experiment harness')
+    parser.add_argument('--params', type=str, default='easy,lossy',
+                        help='comma separated list of params')
+    parser.add_argument('--setups', type=str, default='control,nat,vpn',
+                        help='comma separated list of setups')
+    parser.add_argument('--cli', action='store_true',
+                        help='start a cli with the first param and setup')
+    parser.add_argument('--trials', '-t', type=int, default=30)
+
+    args = parser.parse_args()
+    params = args.params.split(',')
+    setups = args.setups.split(',')
+
+    if args.cli:
+        mn = DetourNet(PARAMS[params[0]]())
+        SETUP[setups[0]](mn)
         CLI(mn)
         mn.stop()
     else:
-        lossy()
+        for param in params:
+            for setup in setups:
+                scenario(setup, param, args.trials)
 
 
 if __name__ == '__main__':
