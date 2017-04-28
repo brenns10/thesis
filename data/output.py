@@ -37,11 +37,17 @@ def get_numpy_array(filename):
 
 
 def plot_comparison(name):
-    ctrl = get_numpy_array('%s.control.json' % name) / 1000000
-    nat = get_numpy_array('%s.nat.json' % name) / 1000000
-    vpn = get_numpy_array('%s.vpn.json' % name) / 1000000
-    print(len(ctrl), len(nat), len(vpn))
+    mptcp_ctrl = get_numpy_array('%s.control.mptcp.json' % name) / 1000000
+    mptcp_nat = get_numpy_array('%s.nat.mptcp.json' % name) / 1000000
+    mptcp_vpn = get_numpy_array('%s.vpn.mptcp.json' % name) / 1000000
+    vanilla_ctrl = get_numpy_array('%s.control.vanilla.json' % name) / 1000000
+    vanilla_nat = get_numpy_array('%s.nat.vanilla.json' % name) / 1000000
+    vanilla_vpn = get_numpy_array('%s.vpn.vanilla.json' % name) / 1000000
     fig, ax = plt.subplots()
-    ax.boxplot([ctrl, nat, vpn], labels=['Control', 'NAT', 'VPN'])
+    data = [mptcp_ctrl, mptcp_nat, mptcp_vpn, vanilla_ctrl, vanilla_nat,
+            vanilla_vpn]
+    labels = ['1 Subflow', 'NAT', 'VPN', 'TCP', 'TCP(NAT)', 'TCP(VPN)']
+    print(map(len, data))
+    ax.boxplot(data, labels=labels)
     ax.set_ylabel('Throughput (Mbps)')
     ax.set_title('Throughput Comparison (%s)' % name)
