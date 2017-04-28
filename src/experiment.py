@@ -30,11 +30,9 @@ import sys
 import time
 
 from mininet.cli import CLI
-from mininet.log import lg, LEVELS
 from mininet.net import Mininet
 from mininet.topo import Topo
 from mininet.link import TCLink
-from mininet.util import waitListening
 
 
 BASIC_PARAMS = {
