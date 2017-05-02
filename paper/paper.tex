@@ -1,11 +1,18 @@
-\documentclass{article}
+\documentclass{cwru}
 
-\usepackage[margin=1.5in]{geometry}
-\usepackage{setspace}
+\title{Improving TCP connectivity via Multipath Overlays}
+\author{Stephen Brennan}
+\date{June, 2017} % Graduate date
+\doctype{thesis}
+\degree{Master of Computing and Information Science}
+\department{Electrical Engineering and Computer Science}
+
+\defensedate{June 2, 2017}
+
 \usepackage{listings}
 \usepackage{graphicx}
-\usepackage[font={small,it}]{caption}
 \usepackage{color}
+\usepackage{fancyvrb}
 \definecolor{mygreen}{rgb}{0,0.6,0}
 \definecolor{mygray}{rgb}{0.5,0.5,0.5}
 \definecolor{mymauve}{rgb}{0.58,0,0.82}
@@ -20,18 +27,66 @@
   stringstyle=\color{mymauve},       % string
 }
 
-\doublespacing
-
-\title{Improving TCP connectivity via Multipath Overlays}
-\author{Stephen Brennan}
 \begin{document}
-\maketitle
+\advisor{Michael Rabinovich}
+\committee{Vincenzo Liberatore}
+\committee{Mark Allman}
 
-\section{Background}
+% The organization of the dissertation must follow the order below:
+%
+% Title page
+% Committee Approval Sheet
+% Copyright page (only if copyrighting)
+% Dedication page (optional)
+% Table of Contents
+% List of Tables
+% List of Figures
+% Preface (optional)
+% Acknowledgements (optional)
+% List of Abbreviations (optional)
+% Glossary (optional)
+% Abstract
+% --TEXT--
+% Appendix
+% Bibliography
+
+\maketitle
+\makeapprovalsheet
+
+\frontmatter
+\tableofcontents
+
+\cleardoublepage
+\phantomsection
+\addcontentsline{toc}{chapter}{List of Figures}
+\listoffigures
+
+%\begin{acknowledgments}
+%\lipsum[1-3]
+%\end{acknowledgments}
+
+% If you're using `glossaries` package
+
+%\cleardoublepage
+%\phantomsection
+%\addcontentsline{toc}{chapter}{List of Acronyms}
+%\printglossary[type=\acronymtype]
+
+%\cleardoublepage
+%\phantomsection
+%\addcontentsline{toc}{chapter}{Glossary}
+%\printglossary
+
+\begin{abstract}
+Abstract abstract abstract.
+\end{abstract}
+
+\mainmatter
+\chapter{Background}
 % Potential additions:
 % - netlink? generic netlink?
 
-\subsection{Multipath TCP}
+\section{Multipath TCP}
 % Our discussion of Multipath TCP needs to be in enough depth that the reader
 % understands how it works - essentially covering at least the first few pages
 % of the RFC. In particular:
@@ -49,7 +104,7 @@ these devices have become more common, most Internet protocols do not have ways
 to take advantage of multiple interfaces.
 
 Multipath TCP (MPTCP) is an extension to TCP which aims to mitigate this
-problem. It is designed with several goals in mind:
+problem. It is designed with the following goals in mind \cite{rfc6824}.
 
 \begin{itemize}
   \item To improve both the throughput and reliability of connections, relative
@@ -61,25 +116,44 @@ problem. It is designed with several goals in mind:
 \end{itemize}
 % https://tools.ietf.org/html/rfc6182#section-2
 
-It achieves these goals by layering the protocol b
+\begin{figure}[h]
+  \centering
+\begin{BVerbatim}
+                             +-------------------------------+
+                             |           Application         |
++---------------+            +-------------------------------+
+|  Application  |            |             MPTCP             |
++---------------+            + - - - - - - - + - - - - - - - +
+|      TCP      |            | Subflow (TCP) | Subflow (TCP) |
++---------------+            +-------------------------------+
+|      IP       |            |       IP      |      IP       |
++---------------+            +-------------------------------+
+\end{BVerbatim}
+  \caption[Comparison of TCP and MPTCP Protocol Stacks]{Comparison of Standard
+    TCP and MPTCP Protocol Stacks. Originally from \cite{rfc6824}}
+  \label{fig:layers}
+\end{figure}
 
-\subsection{Netfilter}
+To achieve these goals, MPTCP is located between TCP and the application layer,
+as shown in Figure~\ref{fig:layers}
+
+\section{Netfilter}
 % Discuss what it is, and how it can be used to perform NAT
 
-\subsection{OpenVPN}
+\section{OpenVPN}
 % This will have to at least touch on TUN/TAP devices, and the variations of the
 % OpenVPN protocol.
 
 
-\section{Related Work}
+\chapter{Related Work}
 % Binder
 % SCTP
-\subsection{Detour Routing}
+\section{Detour Routing}
 % this feels more like background than related work... this motivates the whole
 % project really.
 
 
-\section{Implementation}
+\chapter{Implementation}
 % Section intro:
 % 1. Expectations (what hosts are there, and which ones run our code?)
 % 2. Overview of the distinct pieces of software (client kernel, client daemon,
@@ -120,7 +194,7 @@ in Figure~\ref{f:MovingParts}.
 \begin{figure}[h]
   \centering
   \includegraphics[width=\textwidth]{figures/MovingParts.pdf}
-  \caption{
+  \caption[Interaction of client, detour, and server]{
     The components and their communications. In \textbf{A}, the path manager
     requests an overlay route. In \textbf{B}, the client daemon reports overlay
     routes back to the path managers. In \textbf{C} and \textbf{D}, the client
@@ -141,13 +215,13 @@ connection across every available detour, until a predefined limit is reached.
 In the remainder of this section, we will discuss each of these components at
 length.
 
-\subsection{Detour Daemon}
+\section{Detour Daemon}
 
 We have implemented two different mechanisms for tunneling MPTCP subflows across
 a detour. In both cases, the detour host must run a daemon that assists in
 tunneling traffic from the client to the server.
 
-\subsubsection{OpenVPN Tunneling}
+\subsection{OpenVPN Tunneling}
 
 The first mechanism involves the open-source tool OpenVPN. Detours run a
 specially configured OpenVPN server. Clients connect to this VPN, creating a
@@ -199,7 +273,7 @@ headers) are required. To avoid fragmentation, the connection's maximum segment
 size (MSS) may need to be adjusted, although in our testing, this was not
 required.
 
-\subsubsection{NAT Tunneling}
+\subsection{NAT Tunneling}
 
 The second approach directly modifies packets, without actually using a protocol
 (like OpenVPN) for tunneling. Since we only need to forward some connections to
@@ -236,9 +310,11 @@ As mentioned earlier, the server address must be communicated to the detour
 ahead of time in order to use this scheme. To that end, we have designed a
 simple UDP-based for clients to ``request'' NAT mappings from a detour. The
 detour listens for requests on UDP port 45672. The request format is shown
-below.
+in Figure~\ref{fig:udp-nat-packet}.
 
-\begin{lstlisting}
+\begin{figure}
+  \centering
+\begin{BVerbatim}
 +-----------------------------------+
 | ver(1) | op(1)  | reserved (2)    |
 +-----------------------------------+
@@ -246,7 +322,10 @@ below.
 +-----------------------------------+
 | rpt (2 bytes)   | dpt (2 bytes)   |
 +-----------------|-----------------+
-\end{lstlisting}
+\end{BVerbatim}
+  \caption{UDP NAT tunnel request structure}
+  \label{fig:udp-nat-packet}
+\end{figure}
 
 The \texttt{ver} field is a protocol version, currently set to 1. The
 \texttt{op} field contains the operation of this message: request (0) or
@@ -330,7 +409,7 @@ connection is created on the client. While the client may simply send packets to
 a new remote through an OpenVPN tunnel, it must incur a RTT delay requesting a
 new tunnel from the NAT detour before it can begin establishing a subflow.
 
-\subsection{Path Manager}
+\section{Path Manager}
 
 To enable subflows to use the detours created above, we implement a custom MPTCP
 path manager within the Linux kernel. The path manager is a module which
@@ -367,7 +446,7 @@ the opportunity to create a new subflow along this detour. If the detour was
 OpenVPN type, every worker notified. If the detour was NAT type, then only
 connections which match the server address and port are notified.
 
-\subsection{Client Daemon}
+\section{Client Daemon}
 
 The client daemon has several responsibilities. First, it must create OpenVPN
 connections report them to the kernel. Second, it must respond to detour
@@ -380,7 +459,7 @@ the kernel. Then, it waits listening for detour requests from the kernel. For
 each request, it requests a detour from every NAT detour address. Upon receiving
 responses, it sends them the the kernel as well.
 
-\subsubsection{Client Communication}
+\subsection{Client Communication}
 
 In order to communicate between kernel and userspace, we use Generic Netlink
 sockets. Netlink is an address family for the socket interface
@@ -416,5 +495,11 @@ configuration file. It then reports these tunnels to the kernel, using a
 \texttt{DETOUR\_C\_DEL} message type to delete a tunnel entry it has previously
 added. Finally, the \texttt{DETOUR\_C\_ECHO} message type requests that the
 kernel log all tunnels for diagnostics.
+
+\backmatter
+\appendix
+
+\bibliographystyle{ieeetr}
+\bibliography{paper}
 
 \end{document}
