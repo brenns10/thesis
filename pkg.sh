@@ -1,7 +1,7 @@
 #!/usr/bin/sh
 make -C src clean
 rm -f vm.tar
-tar cf vm.tar \
+tar cJf vm.tar.xz \
 	src/* \
 	etc/* \
 	tmp/* \
