@@ -47,7 +47,7 @@ def plot_comparison(name):
     data = [mptcp_ctrl, mptcp_nat, mptcp_vpn, vanilla_ctrl, vanilla_nat,
             vanilla_vpn]
     labels = ['1 Subflow', 'NAT', 'VPN', 'TCP', 'TCP(NAT)', 'TCP(VPN)']
-    print(map(len, data))
+    print(list(map(len, data)))
     ax.boxplot(data, labels=labels)
     ax.set_ylabel('Throughput (Mbps)')
     ax.set_title('Throughput Comparison (%s)' % name)

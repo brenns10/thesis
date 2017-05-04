@@ -1,7 +1,22 @@
 @misc{mptcp,
-  title = "Multipath TCP in the Linux Kernel"
-  author = "Paasch, Christoph and Barr\acute{e}, S\acute{e}bastien and others"
-  url = "\url{http://www.multipath-tcp.org}"
+  title = {Multipath {TCP} in the {Linux Kernel}},
+  author = {Paasch, Christoph and Barr\'{e}, S\'{e}bastien and others},
+  url = "http://www.multipath-tcp.org"
+}
+
+@misc{rfc6824,
+	series =	{Request for Comments},
+	number =	6824,
+	howpublished =	{RFC 6824},
+	publisher =	{RFC Editor},
+	doi =		{10.17487/rfc6824},
+	url =		{https://rfc-editor.org/rfc/rfc6824.txt},
+	author =	{Alan Ford and Costin Raiciu and Mark J. Handley and Olivier Bonaventure},
+	title =		{{TCP Extensions for Multipath Operation with Multiple Addresses}},
+	pagetotal =	64,
+	year =		2013,
+	month =		jan,
+	abstract =	{TCP/IP communication is currently restricted to a single path per connection, yet multiple paths often exist between peers. The simultaneous use of these multiple paths for a TCP/IP session would improve resource usage within the network and, thus, improve user experience through higher throughput and improved resilience to network failure.},
 }
 
 @techreport{boucadair-mptcp-plain-mode-10,
@@ -18,4 +33,99 @@
 	month =		mar,
 	day =		9,
 	abstract =	{Because of the lack of Multipath TCP (MPTCP) support at the server side, some service providers now consider a network-assisted model that relies upon the activation of a dedicated function called MPTCP Conversion Point (MCP). Network-Assisted MPTCP deployment models are designed to facilitate the adoption of MPTCP for the establishment of multi-path communications without making any assumption about the support of MPTCP by the communicating peers. MCPs located in the network are responsible for establishing multi-path communications on behalf of endpoints, thereby taking advantage of MPTCP capabilities to achieve different goals that include (but are not limited to) optimization of resource usage (e.g., bandwidth aggregation), of resiliency (e.g., primary/backup communication paths), and traffic offload management. This document specifies extensions for Network-Assisted MPTCP deployment models.},
+}
+
+@inproceedings{radio-agg,
+  title={Transparent Bandwidth Aggregation for Residential Access Networks},
+  author={Duan, Yufeng and Giaccone, Paolo and Castrogiovanni, Pino and Mana, Dario and Borean, Claudio and Rossi, Claudio},
+  booktitle={Global Communications Conference (GLOBECOM), 2015 IEEE},
+  pages={1--6},
+  year={2015},
+  organization={IEEE}
+}
+
+@article{fibertothehome,
+  title={Performance within a fiber-to-the-home network},
+  author={Sargent, Matthew and Allman, Mark},
+  journal={ACM SIGCOMM Computer Communication Review},
+  volume={44},
+  number={3},
+  pages={22--30},
+  year={2014},
+  publisher={ACM}
+}
+
+@inproceedings{dischinger2007characterizing,
+  title={Characterizing residential broadband networks},
+  author={Dischinger, Marcel and Haeberlen, Andreas and Gummadi, Krishna P and Saroiu, Stefan},
+  booktitle={Internet Measurement Comference},
+  pages={43--56},
+  year={2007}
+}
+
+@inproceedings{maier2009dominant,
+  title={On dominant characteristics of residential broadband internet traffic},
+  author={Maier, Gregor and Feldmann, Anja and Paxson, Vern and Allman, Mark},
+  booktitle={Proceedings of the 9th ACM SIGCOMM conference on Internet measurement conference},
+  pages={90--102},
+  year={2009},
+  organization={ACM}
+}
+
+@inproceedings{akella2003empirical,
+  title={An empirical evaluation of wide-area internet bottlenecks},
+  author={Akella, Aditya and Seshan, Srinivasan and Shaikh, Anees},
+  booktitle={Proceedings of the 3rd ACM SIGCOMM conference on Internet measurement},
+  pages={101--114},
+  year={2003},
+  organization={ACM}
+}
+
+@inproceedings{andersen2003best,
+  title={Best-path vs. multi-path overlay routing},
+  author={Andersen, David G and Snoeren, Alex C and Balakrishnan, Hari},
+  booktitle={Proceedings of the 3rd ACM SIGCOMM conference on Internet measurement},
+  pages={91--100},
+  year={2003},
+  organization={ACM}
+}
+
+@article{mbone,
+  title={Mbone: The multicast backbone},
+  author={Eriksson, Hans},
+  journal={Communications of the ACM},
+  volume={37},
+  number={8},
+  pages={54--61},
+  year={1994},
+  publisher={Association for Computing Machinery, Inc.}
+}
+
+@book{ron,
+  title={Resilient overlay networks},
+  author={Andersen, David and Balakrishnan, Hari and Kaashoek, Frans and Morris, Robert},
+  volume={35},
+  number={5},
+  year={2001},
+  publisher={ACM}
+}
+
+@article{detour,
+  title={Detour: Informed Internet routing and transport},
+  author={Savage, Stefan and Anderson, Thomas and Aggarwal, Amit and Becker, David and Cardwell, Neal and Collins, Andy and Hoffman, Eric and Snell, John and Vahdat, Amin and Voelker, Geoff and others},
+  journal={Ieee Micro},
+  volume={19},
+  number={1},
+  pages={50--59},
+  year={1999},
+  publisher={IEEE}
+}
+
+@inproceedings{jannotti2000overcast,
+  title={Overcast: reliable multicasting with on overlay network},
+  author={Jannotti, John and Gifford, David K and Johnson, Kirk L and Kaashoek, M Frans and others},
+  booktitle={Proceedings of the 4th Conference on Symposium on Operating System Design \& Implementation-Volume 4},
+  pages={14},
+  year={2000},
+  organization={USENIX Association}
 }
