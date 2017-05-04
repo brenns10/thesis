@@ -13,6 +13,7 @@
 \usepackage{graphicx}
 \usepackage{color}
 \usepackage{fancyvrb}
+\usepackage{acro}
 \definecolor{mygreen}{rgb}{0,0.6,0}
 \definecolor{mygray}{rgb}{0.5,0.5,0.5}
 \definecolor{mymauve}{rgb}{0.58,0,0.82}
@@ -25,6 +26,11 @@
   escapeinside={(*}{*)},             % if you want to add LaTeX in code
   keywordstyle=\color{blue},         % keyword
   stringstyle=\color{mymauve},       % string
+}
+
+\DeclareAcronym{mptcp}{
+  short = MPTCP,
+  long  = Multipath TCP
 }
 
 \begin{document}
@@ -77,12 +83,52 @@
 %\addcontentsline{toc}{chapter}{Glossary}
 %\printglossary
 
+% because they were probably used above
+\acresetall
+
 \begin{abstract}
 Abstract abstract abstract.
 \end{abstract}
 
 \mainmatter
-\chapter{Background}
+\chapter{Introduction}
+
+In recent years, several forces have driven the development of the Internet.
+Residential bandwidth has increased, and residential fiber connections are
+becoming more common. % citation needed?
+While conventional wisdom has been that access links are usually the bottleneck,
+this is not always the case \cite{akella2003empirical}. As bandwidths have
+increased, studies have shown that these bandwidths are not fully utilized
+\cite{fibertothehome}. While there are many explanations for this, one
+possibility is that bottlenecks have moved to within the network core.
+
+It is sometimes the case that paths other than the Internet routed one show
+superior connection properties between two hosts. This could be due to poor
+routing metrics, restrictive routing policies, or manual traffic shaping on the
+part of Internet service providers \cite{detour}. Savage \textit{et al.} have
+shown that by adding a ``waypoint'' host into a path, latency and packet drop
+rates can be reduced.
+
+Overlay routing systems have been developed as a way to leverage this, as well
+as to provide services not widely available on the general Internet, such as
+multicasting \cite{ron,mbone,jannotti2000overcast}. However, overlay networks
+have two key limitations. First, they operate on the application layer, so that
+most pre-existing programs cannot use them. Second, though they may offer an
+alternative to the Internet routed path, overlay networks rarely route traffic
+through multiple paths simultaneously. One instance which does use multiple
+paths simply uses them for redundancy, reducing the probability of a packet loss
+by sending it via multiple paths \cite{andersen2003best}.
+
+In parallel to these developments, another set of changes began to emerge.
+Devices with multiple interfaces started to become common, both in consumer
+devices and data center devices. The \ac{mptcp} extension was developed to allow
+TCP connections to take advantage of multiple interfaces. It provides the same
+service to applications, allowing pre-existing applications to use \ac{mptcp}
+simply by upgrading the operating system.
+
+However, \ac{mptcp} is not limited just to devices with multiple network
+interfaces. It may establish flows of information across
+
 % Potential additions:
 % - netlink? generic netlink?
 
@@ -103,14 +149,14 @@ at least two network interfaces: one for cellular data, and one for Wi-Fi. While
 these devices have become more common, most Internet protocols do not have ways
 to take advantage of multiple interfaces.
 
-Multipath TCP (MPTCP) is an extension to TCP which aims to mitigate this
-problem. It is designed with the following goals in mind \cite{rfc6824}.
+\ac{mptcp} is an extension to TCP which aims to mitigate this problem. It is
+designed with the following goals in mind \cite{rfc6824}.
 
 \begin{itemize}
   \item To improve both the throughput and reliability of connections, relative
     to normal TCP.
   \item To remain compatible with applications that use TCP, so that they could
-    use MPTCP without modification.
+    use \ac{mptcp} without modification.
   \item To remain compatible with the Internet as a whole, especially with
     ``middleware'' such as firewalls, proxies, and NATs.
 \end{itemize}
@@ -129,12 +175,12 @@ problem. It is designed with the following goals in mind \cite{rfc6824}.
 |      IP       |            |       IP      |      IP       |
 +---------------+            +-------------------------------+
 \end{BVerbatim}
-  \caption[Comparison of TCP and MPTCP Protocol Stacks]{Comparison of Standard
-    TCP and MPTCP Protocol Stacks. Originally from \cite{rfc6824}}
+\caption[Comparison of TCP and \acs{mptcp} Protocol Stacks]{Comparison of
+  Standard TCP and \ac{mptcp} Protocol Stacks. Originally from \cite{rfc6824}}
   \label{fig:layers}
 \end{figure}
 
-To achieve these goals, MPTCP is located between TCP and the application layer,
+To achieve these goals, \ac{mptcp} is located between TCP and the application layer,
 as shown in Figure~\ref{fig:layers}
 
 \section{Netfilter}
@@ -171,10 +217,10 @@ least three hosts:
 \begin{itemize}
 \item The \emph{client} is the host which adds detour routes, attempting to
   improve its connection quality. The client must be the host which initiates
-  the MPTCP connection.
+  the \ac{mptcp} connection.
 \item The \emph{server} is the host with which the client wishes to communicate.
 \item The \emph{detour} is a host which acts as a waypoint along the overlay
-  route from the client to the server. It tunnels the MPTCP between them. There
+  route from the client to the server. It tunnels the \ac{mptcp} between them. There
   may be more than one detour at a time.
 \end{itemize}
 
@@ -184,12 +230,12 @@ host must run some version of Linux, and the client must run a custom version of
 Linux.
 
 The system is implemented via a number of interacting components. First, a path
-manager extension for the Linux MPTCP implementation, which allows the client's
-kernel to request new detour paths, receive them, and create subflows across
-them. Second, a user-space utility which receives messages from the kernel and
-creates the necessary detour paths. Finally, we implement two different types of
-detour daemons, which run on the detour host. These components are illustrated
-in Figure~\ref{f:MovingParts}.
+manager extension for version 0.91 of the Linux \ac{mptcp} implementation
+\cite{mptcp}, which allows the client's kernel to request new detour paths,
+receive them, and create subflows across them. Second, a user-space utility
+which receives messages from the kernel and creates the necessary detour paths.
+Finally, we implement two different types of detour daemons, which run on the
+detour host. These components are illustrated in Figure~\ref{f:MovingParts}.
 
 \begin{figure}[h]
   \centering
@@ -205,11 +251,11 @@ in Figure~\ref{f:MovingParts}.
 \end{figure}
 
 The typical interaction of these components is as follows. First, the client
-creates a MPTCP connection to the server. The first subflow uses the Internet
+creates a \ac{mptcp} connection to the server. The first subflow uses the Internet
 routed path. Once this connection is fully established, the path manager
 requests overlay routes on which it may create subflows. The client and detour
 daemons negotiate a tunnel, which may be implemented in two different ways. The
-client reports this to the path-managers, which creates subflows for the MPTCP
+client reports this to the path-managers, which creates subflows for the \ac{mptcp}
 connection across every available detour, until a predefined limit is reached.
 
 In the remainder of this section, we will discuss each of these components at
@@ -217,7 +263,7 @@ length.
 
 \section{Detour Daemon}
 
-We have implemented two different mechanisms for tunneling MPTCP subflows across
+We have implemented two different mechanisms for tunneling \ac{mptcp} subflows across
 a detour. In both cases, the detour host must run a daemon that assists in
 tunneling traffic from the client to the server.
 
@@ -411,16 +457,16 @@ new tunnel from the NAT detour before it can begin establishing a subflow.
 
 \section{Path Manager}
 
-To enable subflows to use the detours created above, we implement a custom MPTCP
+To enable subflows to use the detours created above, we implement a custom \ac{mptcp}
 path manager within the Linux kernel. The path manager is a module which
 dictates local policy for creating new subflows and announcing local addresses.
 For example, the \texttt{fullmesh} path manager creates a subflow between each
 address on the client and server.
 
-The path manager receives space within the MPTCP control buffer in order to
+The path manager receives space within the \ac{mptcp} control buffer in order to
 track state, and it registers a set of callbacks with the protocol, so that it
 can be notified of events as they occur. Our path manager (named
-\texttt{detour}) runs a worker when a client-side MPTCP connection becomes fully
+\texttt{detour}) runs a worker when a client-side \ac{mptcp} connection becomes fully
 established (i.e. after the three-way handshake completes). The first thing this
 is send a message to userspace, requesting a detour. Then, it looks through an
 internal list of detours. The kernel maintains two lists of detours (per network
@@ -440,7 +486,7 @@ the client daemon become available only once the daemon has processed the
 request from the kernel.
 
 The kernel listens for new detour routes. When it receives them, it adds them to
-the appropriate internal list. Then, it iterates over every MPTCP connection
+the appropriate internal list. Then, it iterates over every \ac{mptcp} connection
 within the network namespace of the message, waking their workers to give them
 the opportunity to create a new subflow along this detour. If the detour was
 OpenVPN type, every worker notified. If the detour was NAT type, then only
