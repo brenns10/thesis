@@ -1,3 +1,4 @@
+#!/bin/bash
 # Run as root.
 cd
 
@@ -35,5 +36,5 @@ sudo -u ubuntu make -C ~ubuntu/src all
 echo Adding ssh keys...
 echo "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDEupr15Lbq8jFBca/tXhydvD2nKQ/vWnxXzOndG7TqKGy53mtlgR6VzaV4WR3blrLdDG223a64VlQaj00xm+8e/eAn+IRH3RpV2ZvFT+BdZmej8E4y0sSlkiCw2sjtyKiGu0Pyk2HKbA8njG+aVsJ5YSQVwBBP1nEqKoMItvXzZwQJQ09SCeklT5zugcJz+frGFifjz1I6bs7Hb9vNa7hNi79JjJ1rNoeANkBmunW20+M7hMOuNjGWl47XGDlew7tn3vc2Eiiohf0cyrueBPq63Y7tMEfhmyCEPfakkjg5idt3soRGKCBqyoVuYyEIOJSTnuGBkThZteGHLlpKvMVz stephen@greed_2013-09-26" >> ~ubuntu/.ssh/authorized_keys
 
-echo Completed successfully! Rebooting...
-reboot
+echo Completed successfully! Shutting down...
+shutdown -h now
