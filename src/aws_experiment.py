@@ -18,16 +18,30 @@ Prerequisites:
 
 """
 import collections
+import sys
+from io import BytesIO
 from os.path import abspath
 from os.path import dirname
 from os.path import join
 from pprint import pprint
 
 import boto3
+import paramiko
 
+
+NAT_CFG = '''
+client: {
+  detours = ["%s"];
+  vpns = [];
+  daemonize = false;
+  logfile = "daemon-nat.log";
+  loglevel = "DEFAULT";
+}
+'''
 
 # Key Pair Name. Hopefully you named it the same thing in every region.
 KEYPAIR = 'stephen@greed'
+KEYFILE = '/home/stephen/.ssh/id_rsa'
 
 # The filename of the AWS setup script.
 SETUP_SCRIPT = join(dirname(abspath(__file__)), '../etc/aws_exp_setup.sh')
@@ -36,6 +50,9 @@ SETUP_SCRIPT = join(dirname(abspath(__file__)), '../etc/aws_exp_setup.sh')
 # via the Console if things go wrong.
 TAGS = [
     {'Key': 'Project', 'Value': 'Thesis'},
+]
+TAG_FILTER = [
+    {'Name': 'tag:Project', 'Values': ['Thesis']}
 ]
 
 
@@ -150,23 +167,130 @@ def first_time_wait(instances):
         inst.wait_until_running()
 
 
+def ssh_connect(instances):
+    print('Connecting to all instances via ssh...')
+    clients = {}
+    for k, inst in instances.items():
+        print('Connecting to %s' % k)
+        while True:
+            c = paramiko.SSHClient()
+            c.load_system_host_keys()
+            c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            try:
+                c.connect(inst.public_ip_address, username='ubuntu',
+                          key_filename=KEYFILE)
+                clients[k] = c
+                print('Connected to %s (%s)' % (k, inst.public_ip_address))
+                break
+            except:
+                print('Failed to connect. Retrying...')
+                pass
+    return clients
+
+
+def many_iperf(n, client_transport, server_chan, server_output, instances):
+    print('IPERF: ', end='')
+    sys.stdout.flush()
+    for _ in range(n):
+        client_chan = client_transport.open_session()
+        client_chan.set_combine_stderr(True)
+        client_chan.exec_command(command='iperf3 -c %s -J' %
+                                 instances['server'].public_ip_address)
+        print('<', end='')
+        sys.stdout.flush()
+        while not client_chan.exit_status_ready():
+            client_chan.recv(4096)
+        client_chan.close()
+        print('=', end='')
+        sys.stdout.flush()
+
+        while server_chan.recv_ready():
+            out = server_chan.recv(4096)
+            server_output.write(out)
+        print('>', end='')
+        sys.stdout.flush()
+    print()
+
+
+def run_exp_nat(instances, clients):
+    detour_transport = clients['detour'].get_transport()
+    client_transport = clients['client'].get_transport()
+    server_transport = clients['server'].get_transport()
+
+    # start detour daemon
+    print('Starting detour daemon...')
+    detour_chan = detour_transport.open_session()
+    detour_chan.set_combine_stderr(True)
+    detour_chan.exec_command(command='cd src; sudo ./nat_detour.py')
+    print(detour_chan.recv(4096))
+
+    # start server
+    print('Starting iperf server...')
+    server_chan = server_transport.open_session()
+    server_chan.set_combine_stderr(True)
+    server_chan.exec_command(command='iperf3 -s -J')
+
+    # run iperf several times, recv()ing server output
+    server_output = BytesIO()
+    many_iperf(30, client_transport, server_chan, server_output, instances)
+
+    # save control server output
+    with open('server1.json', 'wb') as f:
+        f.write(server_output.getvalue())
+
+    # send a client daemon config
+    print('Sending over the daemon config...')
+    sftp = clients['client'].open_sftp()
+    nat_cfg = NAT_CFG % instances['detour'].public_ip_address
+    sftp.putfo(BytesIO(nat_cfg.encode('utf8')),
+               '/home/ubuntu/etc/daemon-nat-aws.conf')
+    sftp.close()
+
+    # run the client daemon
+    print('Starting up the client daemon...')
+    client_daemon_chan = client_transport.open_session()
+    client_daemon_chan.set_combine_stderr(True)
+    client_daemon_chan.exec_command(
+        command='cd src; sudo ./client daemon ../etc/daemon-nat-aws.conf'
+    )
+
+    server_output = BytesIO()
+    many_iperf(30, client_transport, server_chan, server_output, instances)
+
+    # save nat server output
+    with open('server2.json', 'wb') as f:
+        f.write(server_output.getvalue())
+
+    clients['detour'].close()
+    clients['server'].close()
+    clients['client'].close()
+
+
 def terminate_all(instances):
     for k, inst in instances.items():
         print('Terminating instance %s...' % k)
         inst.terminate()
 
-    for k, inst in instances.items():
-        print('Waiting for instance %s to terminate...' % k)
-        inst.wait_until_terminated()
+
+def cleanup():
+    for k in RESOURCE_PARAMS_EACH.keys():
+        ec2 = boto3.resource('ec2', **resource_params(k))
+        ec2.instances.filter(Filters=TAG_FILTER).terminate()
 
 
 def main():
     instances = create_instances()
     first_time_wait(instances)
-    print('Hit ENTER when you want to terminate them.')
-    input()
+    clients = ssh_connect(instances)
+    run_exp_nat(instances, clients)
+    print('Opening ipdb... When you exit, we\'re done here.')
+    import ipdb; ipdb.set_trace()
     terminate_all(instances)
 
 
+
 if __name__ == '__main__':
-    main()
+    if len(sys.argv) > 1 and sys.argv[1] == 'cleanup':
+        cleanup()
+    else:
+        main()
