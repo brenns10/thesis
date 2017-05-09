@@ -32,6 +32,10 @@
   short = MPTCP,
   long  = Multipath TCP
 }
+\DeclareAcronym{dss}{
+  short = DSS,
+  long  = Data Sequence Signal
+}
 
 \begin{document}
 \advisor{Michael Rabinovich}
@@ -99,38 +103,40 @@ becoming more common. % citation needed?
 While conventional wisdom has been that access links are usually the bottleneck,
 this is not always the case \cite{akella2003empirical}. While they have
 increased, studies have shown that residential link bandwidths are not fully
-utilized \cite{fibertothehome}. While there are many explanations for this, one
-possibility is that bottlenecks have moved to within the network core.
+utilized, especially fiber connections \cite{fibertothehome}. While there are
+many explanations for this, one possibility is that bottlenecks have moved to
+within the network core.
 
 It is sometimes the case that paths other than the Internet routed one show
 superior connection properties between two hosts. This could be due to poor
 routing metrics, restrictive routing policies, or manual traffic shaping on the
 part of Internet service providers \cite{detour}. Savage \textit{et al.} have
-shown that by adding a ``waypoint'' host into a path, latency and packet drop
+shown that by adding a ``detour'' host into a path, latency and packet drop
 rates can be reduced.
 
 Overlay routing systems have been developed as a way to leverage this, as well
 as to provide services not widely available on the general Internet, such as
-multicasting \cite{ron,mbone,jannotti2000overcast}. However, overlay networks
-have two key limitations. First, they operate on the application layer, so that
-most pre-existing programs cannot use them. Second, though they may offer an
-alternative to the Internet routed path, overlay networks rarely route traffic
-through multiple paths simultaneously. One instance which does use multiple
-paths simply uses them for redundancy, reducing the probability of a packet loss
-by sending it via multiple paths \cite{andersen2003best}.
+multicasting \cite{ron,mbone,jannotti2000overcast}. While overlay networks are
+able to provide new and interesting features, they are typically limited by
+deployment or implementation details.
 
-In parallel to these developments, another set of changes began to emerge.
-Devices with multiple interfaces started to become common, both in consumer
-devices and data center devices. The \ac{mptcp} extension was developed to allow
-TCP connections to take advantage of multiple interfaces. It provides the same
-service to applications, allowing pre-existing applications to use \ac{mptcp}
+In parallel to the development of these overlay systems, another set of changes
+began to emerge. Devices with multiple interfaces started to become common, both
+in consumer devices and data center devices. The \ac{mptcp} extension was
+developed to allow TCP connections to take advantage of multiple network
+interfaces, and thus multiple routing paths. It provides a TCP-compatible
+service to applications, allowing pre-existing applications to use \ac{mptcp},
 simply by upgrading the operating system.
 
 However, \ac{mptcp} is not limited just to devices with multiple network
-interfaces. It may establish flows of information across
-
-% Potential additions:
-% - netlink? generic netlink?
+interfaces. A \ac{mptcp} connection consists of multiple TCP subflows, and the
+specification is general enough to allow these subflows to belong to the same
+network interfaces, but traverse a different path. As a result, \ac{mptcp} could
+be used to route connections across a detour. In this thesis, we implement and
+evaluate a mechanism for doing just that. Our system is based on version 0.91 of
+the \ac{mptcp} implementation for the Linux kernel \cite{mptcp}. We find that
+this system is capable of aggregating the throughput multiple paths, without any
+additional network interfaces.
 
 \section{Multipath TCP}
 % Our discussion of Multipath TCP needs to be in enough depth that the reader
@@ -143,11 +149,11 @@ interfaces. It may establish flows of information across
 % - path management and data scheduling
 % - ? how the linux kernel implementation is structured
 
-In recent years, multi-homed devices have become increasingly common. The most
-obvious example of these devices is the smartphone, which typically comes with
-at least two network interfaces: one for cellular data, and one for Wi-Fi. While
-these devices have become more common, most Internet protocols do not have ways
-to take advantage of multiple interfaces.
+Recently, multi-homed devices have become increasingly common. The most obvious
+example of these devices is the smartphone, which typically comes with at least
+two network interfaces: one for cellular data, and one for Wi-Fi. While these
+devices have become more common, most Internet protocols do not have ways to
+take advantage of multiple interfaces.
 
 \ac{mptcp} is an extension to TCP which aims to mitigate this problem. It is
 designed with the following goals in mind \cite{rfc6824}.
@@ -180,8 +186,51 @@ designed with the following goals in mind \cite{rfc6824}.
   \label{fig:layers}
 \end{figure}
 
-To achieve these goals, \ac{mptcp} is located between TCP and the application layer,
-as shown in Figure~\ref{fig:layers}
+To achieve these goals, \ac{mptcp} is located between TCP and the application
+layer, as shown in Figure~\ref{fig:layers}. To applications which aren't aware
+of \ac{mptcp}, the interface is exactly the same as TCP, accessed through the
+same socket operations and interface.
+
+A \ac{mptcp} connection begins similarly to a TCP connection, but with the
+addition of the TCP option with subtype \texttt{MP\_CAPABLE}. Additional TCP
+connections (referred to as ``subflows'') may be created between the two hosts
+once the initial one is established, using the \ac{mptcp} option subtype
+\texttt{MP\_JOIN}.
+
+Data has sequence numbers at both the subflow level and at the connection level.
+Each subflow has a \ac{dss} negotiated via the \ac{mptcp} option subtype
+\texttt{DSS}, which maps subflow sequence numbers to data sequence numbers. Data
+is acknowledged both at the subflow level (via the \texttt{SYN} flag), and at
+the data level (via a flag within the \ac{dss}).
+
+As a result of this flexibility in labeling data with sequence numbers, data may
+be split up across multiple subflows, or even transmitted redundantly. In the
+Linux kernel implementation, determining how data should be split up is the job
+of a modular component called a scheduler \cite{mptcp}. The default scheduler
+implementation selects the subflow with the smallest RTT and fills up its
+congestion window. Other implementations include a naive round-robin scheduler
+and one which sends data redundantly across each subflow. Additional schedulers
+have been proposed, to mitigate problems such as head-of-line blocking and
+bufferbloat \cite{paasch2014experimental}. In this thesis, we consider only the
+Lowest-RTT First scheduler.
+
+An implementation may establish a new subflow with its peer at any time, using
+the same address, or using a new one. Additional addresses may be passively
+advertised using the \ac{mptcp} option subtype \texttt{ADD\_ADDR}, and they may
+be removed via the \ac{mptcp} option subtype \texttt{REMOVE\_ADDR}. These
+options are not reliably transmitted, so they are purely informational. While
+either side of a connection may initiate a new subflow, it is expected that the
+client initiate most subflows.
+
+In order to decide when to create and destroy new subflows, the Linux
+implementation uses another modular component called a ``path manager''
+\cite{mptcp}. The default implementation does nothing (except accepting incoming
+connections). The Linux implementation also includes an \texttt{ndiffports} path
+manager, which initiates up to $N$ subflows with a server, from different source
+ports. A \texttt{fullmesh} path manager establishes subflows between every pair
+of client addresses and advertised server addresses. A major part of the
+implementation of this thesis is a path manager for the Linux kernel \ac{mptcp}
+implementation.
 
 \section{Netfilter}
 % Discuss what it is, and how it can be used to perform NAT
