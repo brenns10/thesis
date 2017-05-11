@@ -232,21 +232,34 @@ of client addresses and advertised server addresses. A major part of the
 implementation of this thesis is a path manager for the Linux kernel \ac{mptcp}
 implementation.
 
-\section{Netfilter}
-% Discuss what it is, and how it can be used to perform NAT
+\section{Detour and Overlay Routing}
 
-\section{OpenVPN}
-% This will have to at least touch on TUN/TAP devices, and the variations of the
-% OpenVPN protocol.
+Overlay networks are networks constructed on top of an existing ``substrate''
+network. Nodes route traffic among each other using the substrate network rather
+than direct links. Traffic is routed through a sequence of overlay nodes before
+reaching the final destination, rather than being directly routed through the
+substrate. In the case of the Internet, these networks can be advantageous
+because they can add functionality that is not widely deployed (such as
+multicasting) and they can make routing decisions based on more information than
+the Internet.
 
+Several overlay network approaches have been proposed and deployed. An early
+example, the M-Bone, connected networks capable of multicasting via tunnels
+\cite{mbone}. This allowed multicasting even though the Internet as a whole did
+not support it. % CONTINUE HERE
 
-\chapter{Related Work}
-% Binder
-% SCTP
-\section{Detour Routing}
-% this feels more like background than related work... this motivates the whole
-% project really.
+In \cite{detour}, Savage \textit{et al.} measured the pairwise latency and
+packed drop rates between a group of hosts. From this dataset, they searched for
+instances where these metrics were better along a ``detour'' route going through
+a third host. They found that half of all pairs of hosts had a ``detour'' route
+with lower latency, and 15\% of the pairs of hosts had a path with at least 25\%
+improvement in latency. For packet loss, 80\% of the pairs had a lower packet
+loss rate, and in nearly half, the packet loss rate improved by a factor of six.
+This finding motivated their Detour routing system, a collection of edge devices
+which perform network address translation, routing packets to other detour
+routers, or to their final destination.
 
+% oTCP
 
 \chapter{Implementation}
 % Section intro:
