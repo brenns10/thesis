@@ -4,29 +4,40 @@ The no-bullshit high-level outline and overview of the paper.
 
 ## Introduction
 
-Motivates the mechanism and presents background information. The initial body of
-the Intro (before subsections begin) talks about how frequently users can't get
-their full link bandwidth because the network core is congested, while last-mile
-links are much more capable than they used to be. Overlay networks involving
-alternative routes have been proposed as a way to circumvent these problems as
-well as provide additional functionality to the network (multicast). It also
-discusses that, in parallel, multipath tcp has been developing as a way for
-multi-homed devices to use all interfaces. Then stop it there and have a
-"thesis" statement:
+Before we go into the subsections of the Introduction, the header paragraph
+describes what this is, and why. Should be a paragraph or two. Don't go all user
+story or anything. Don't want to make unsubstantiated claims.
 
-> This thesis proposes, implements, and evaluates a method for using multiple
-> routes in a single TCP connection as well as exploring new ones.
+### Inefficiencies in Internet Routing
 
-After this, the background/related work could be subsections of Introduction, or
-subsections of their own new "chapter".
+Describe the eagle's eye view of how the internet works (a few sentences).
+Describe how routing occurs, and the major protocols working in the background.
 
-### Overlay Routing (Background)
+Then, basically cite detour a bunch to say that the Internet routed path is not
+always best.
 
-Here I can discuss in-depth the literature on overlay routing. There have been
-lots of papers on them. I can highlight the work that has been done and where
-mine differs.
+Talk about overlay routing systems, in general.
 
-### Multipath TCP (Background)
+### Underutilization of Access Links
+
+Cite Allman to say that high-bandwidth access links aren't heavily utilized. If
+access links are mostly free, and there are better paths to use, why not use
+them? Additionally, why not combine them until your access links can't handle
+it?
+
+Give the concept. Use multiple paths to your destination in your flow, in order
+to improve throughput.
+
+### Contributions
+
+Then, describe what exactly it is that this thesis does.
+1. A mechanism for using MPTCP and routing using detours.
+2. Evaluation that demonstrates that the approach can aggregate bandwidth.
+
+## Background and Related Work
+
+### MPTCP
+- mention SCTP
 
 Here I can give a full working knowledge of the MPTCP protocol. As I've laid out
 in the comments of my paper, this should include:
@@ -38,7 +49,16 @@ in the comments of my paper, this should include:
 - path management and data scheduling
 - ? how the linux kernel implementation is structured
 
-### Others?
+### Overlay Routing
+
+Discuss the many studies which have been done. Make sure to differentiate.
+- Detour
+- RON
+- oTCP?
+
+Perhaps a subsubsection saying what we do that's different from the others.
+
+### Netfilter, OpenVPN
 
 I have sections for Netfilter and OpenVPN. These are already getting a fair
 amount of discussion in the implementation section. I may not need to add
@@ -77,7 +97,7 @@ Here I discuss the kernel component.
 Here I discuss the userspace client component. It seems that I have lumped in a
 lot of background discussion on Netlink here.
 
-## Experiments
+## Evaluation
 
 Here I should lay out my framework for evaluating. In particular, that the goal
 of the project is not to identify route selection techniques, but rather to

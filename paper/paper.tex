@@ -36,6 +36,19 @@
   short = DSS,
   long  = Data Sequence Signal
 }
+\DeclareAcronym{as}{
+  short        = AS,
+  long         = Autonomous System,
+  short-plural = es
+}
+\DeclareAcronym{bgp}{
+  short = BGP,
+  long  = Border Gateway Protocol
+}
+\DeclareAcronym{ospf}{
+  short = OSPF,
+  long  = Open Shortest Path First
+}
 
 \begin{document}
 \advisor{Michael Rabinovich}
@@ -97,46 +110,83 @@ Abstract abstract abstract.
 \mainmatter
 \chapter{Introduction}
 
-In recent years, several forces have driven the development of the Internet.
-Residential bandwidth has increased, and residential fiber connections are
-becoming more common. % citation needed?
-While conventional wisdom has been that access links are usually the bottleneck,
-this is not always the case \cite{akella2003empirical}. While they have
-increased, studies have shown that residential link bandwidths are not fully
-utilized, especially fiber connections \cite{fibertothehome}. While there are
-many explanations for this, one possibility is that bottlenecks have moved to
-within the network core.
+This thesis proposes a mechanism for exploring and adding alternative paths to a
+TCP connection, for the purpose of improving application throughput. These
+alternative paths travel through ``detour'' hosts, ensuring that the paths are
+distinct from the Internet routed path. The bandwidth of these paths can be
+aggregated, allowing better throughput than any of the constituent paths.
 
-It is sometimes the case that paths other than the Internet routed one show
-superior connection properties between two hosts. This could be due to poor
-routing metrics, restrictive routing policies, or manual traffic shaping on the
-part of Internet service providers \cite{detour}. Savage \textit{et al.} have
-shown that by adding a ``detour'' host into a path, latency and packet drop
-rates can be reduced.
+\section{Internet Routing Inefficiencies}
 
-Overlay routing systems have been developed as a way to leverage this, as well
-as to provide services not widely available on the general Internet, such as
-multicasting \cite{ron,mbone,jannotti2000overcast}. While overlay networks are
-able to provide new and interesting features, they are typically limited by
-deployment or implementation details.
+The Internet is made up of several \acp{as}, each containing many routers.
+Routers forward packets along their outgoing interfaces according to an internal
+routing table. This table is populated with routes learned from the external
+\ac{bgp}, as well as intra-\acs{as} protocols such as \ac{ospf}. Administrators
+have considerable freedom to enforce local policy on which routes to advertise,
+and which routes use. Additionally, the metrics used in route selection include
+hop count and \ac{as} count, which may not correlate well with important path
+characteristics.
 
-In parallel to the development of these overlay systems, another set of changes
-began to emerge. Devices with multiple interfaces started to become common, both
-in consumer devices and data center devices. The \ac{mptcp} extension was
-developed to allow TCP connections to take advantage of multiple network
-interfaces, and thus multiple routing paths. It provides a TCP-compatible
-service to applications, allowing pre-existing applications to use \ac{mptcp},
-simply by upgrading the operating system.
+As a result, the default Internet path between hosts is not always the ``best
+path'' with respect to characteristics such as latency or loss rate. In
+\cite{detour}, Savage \textit{et al.} measured the pairwise latency and packet
+drop rates among a group of hosts. From this dataset, they searched for
+instances where these metrics were better along a ``detour'' route going through
+a third host. They found that half of all pairs of hosts had a ``detour'' route
+with lower latency, and 15\% of the pairs of hosts had a path with at least 25\%
+improvement in latency. For packet loss, 80\% of the pairs had a lower packet
+loss rate, and in nearly half, the packet loss rate improved by a factor of six.
 
-However, \ac{mptcp} is not limited just to devices with multiple network
-interfaces. A \ac{mptcp} connection consists of multiple TCP subflows, and the
-specification is general enough to allow these subflows to belong to the same
-network interfaces, but traverse a different path. As a result, \ac{mptcp} could
-be used to route connections across a detour. In this thesis, we implement and
-evaluate a mechanism for doing just that. Our system is based on version 0.91 of
-the \ac{mptcp} implementation for the Linux kernel \cite{mptcp}. We find that
-this system is capable of aggregating the throughput multiple paths, without any
-additional network interfaces.
+Overlay networks have been proposed as a way to experiment with new routing
+techniques. These techniques create a second network on top of the existing
+Internet. Peers in these overlay are connected by \textit{virtual links}, which
+are simply routes in the underlying Internet. Packets are tunneled from peer to
+peer until reaching their end destination. Overlay networks like these have been
+shown to improve on path metrics like throughput and loss rates
+\cite{detour,ron}.
+
+\section{Access Link Underutilization}
+
+With the advent of fiber-to-the-home connections, residential access link speeds
+have been increasing. While conventional wisdom has been that access links are
+usually the bottleneck, this is not always the case \cite{akella2003empirical}.
+While they have increased, studies have shown that residential link bandwidths
+are not fully utilized, especially fiber connections \cite{fibertothehome}.
+There are many reasons why this is this is the case. For one, short-lived TCP
+connections may never leave the slow start phase. For another, TCP initial
+window settings may not be high enough to accommodate faster links. However,
+sometimes the default Internet route may not be able to accommodate these higher
+speeds.
+
+With alternative routes available that may perform better, it makes sense to
+explore these alternative routes. Rather than selecting a single path, it also
+makes sense to use both simultaneously, aggregating their available throughput.
+
+\section{Contributions}
+
+This thesis presents a mechanism for using alternative routes that traverse a
+single ``detour'' host. This mechanism is based on \ac{mptcp}, establishing
+subflows through each alternative route. Using \ac{mptcp} allows multiple routes
+to be used for a single connection, with data divided across each route.
+Additionally, since \ac{mptcp} presents the same reliable, in-order stream API
+that TCP does, applications using TCP can run unmodified while taking advantage
+of multiple paths.
+
+The contributions of this thesis are as follows:
+\begin{itemize}
+\item A system of kernel modifications and user-space tools that allow
+  alternative routes to be added to \ac{mptcp} connections.
+\item An evaluation of the method on simulated and real world networks.
+\end{itemize}
+
+The remainder of this thesis will follow the following structure. Background and
+related work are discussed in Chapter~\ref{c:bgrw}. The implementation of our
+system is described in Chapter~\ref{c:impl}. Experimental evaluation is
+presented in Chapter~\ref{c:eval}. Finally, future work and conclusions are
+discussed in Chapter~\ref{c:fwconclude}.
+
+\chapter{Background and Related Work}
+\label{c:bgrw}
 
 \section{Multipath TCP}
 % Our discussion of Multipath TCP needs to be in enough depth that the reader
@@ -248,20 +298,11 @@ example, the M-Bone, connected networks capable of multicasting via tunnels
 \cite{mbone}. This allowed multicasting even though the Internet as a whole did
 not support it. % CONTINUE HERE
 
-In \cite{detour}, Savage \textit{et al.} measured the pairwise latency and
-packed drop rates between a group of hosts. From this dataset, they searched for
-instances where these metrics were better along a ``detour'' route going through
-a third host. They found that half of all pairs of hosts had a ``detour'' route
-with lower latency, and 15\% of the pairs of hosts had a path with at least 25\%
-improvement in latency. For packet loss, 80\% of the pairs had a lower packet
-loss rate, and in nearly half, the packet loss rate improved by a factor of six.
-This finding motivated their Detour routing system, a collection of edge devices
-which perform network address translation, routing packets to other detour
-routers, or to their final destination.
 
 % oTCP
 
 \chapter{Implementation}
+\label{c:impl}
 % Section intro:
 % 1. Expectations (what hosts are there, and which ones run our code?)
 % 2. Overview of the distinct pieces of software (client kernel, client daemon,
@@ -603,6 +644,12 @@ configuration file. It then reports these tunnels to the kernel, using a
 \texttt{DETOUR\_C\_DEL} message type to delete a tunnel entry it has previously
 added. Finally, the \texttt{DETOUR\_C\_ECHO} message type requests that the
 kernel log all tunnels for diagnostics.
+
+\chapter{Evaluation}
+\label{c:eval}
+
+\chapter{Future Work and Conclusion}
+\label{c:fwconclude}
 
 \backmatter
 \appendix
