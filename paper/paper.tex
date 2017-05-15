@@ -49,6 +49,26 @@
   short = OSPF,
   long  = Open Shortest Path First
 }
+\DeclareAcronym{ron}{
+  short = RON,
+  long  = Resilient Overlay Network
+}
+\DeclareAcronym{lsrr}{
+  short = LSRR,
+  long  = Loose Source and Record Route
+}
+\DeclareAcronym{ssrr}{
+  short = SSRR,
+  long  = Strict Source and Record Route
+}
+\DeclareAcronym{sosr}{
+  short = SOSR,
+  long  = Scalable One-hop Source Routing
+}
+\DeclareAcronym{nat}{
+  short = NAT,
+  long  = Network Address Translation
+}
 
 \begin{document}
 \advisor{Michael Rabinovich}
@@ -164,13 +184,13 @@ makes sense to use both simultaneously, aggregating their available throughput.
 
 \section{Contributions}
 
-This thesis presents a mechanism for using alternative routes that traverse a
-single ``detour'' host. This mechanism is based on \ac{mptcp}, establishing
-subflows through each alternative route. Using \ac{mptcp} allows multiple routes
-to be used for a single connection, with data divided across each route.
-Additionally, since \ac{mptcp} presents the same reliable, in-order stream API
-that TCP does, applications using TCP can run unmodified while taking advantage
-of multiple paths.
+This thesis presents a mechanism for using alternative routes that traverse
+third-party ``detour'' hosts. This mechanism is based on \ac{mptcp},
+establishing subflows through each alternative route. Using \ac{mptcp} allows
+multiple routes to be used for a single connection, with data divided across
+each route. Additionally, since \ac{mptcp} presents the same reliable, in-order
+stream API that TCP does, applications using TCP can run unmodified while taking
+advantage of multiple paths.
 
 The contributions of this thesis are as follows:
 \begin{itemize}
@@ -250,7 +270,7 @@ once the initial one is established, using the \ac{mptcp} option subtype
 Data has sequence numbers at both the subflow level and at the connection level.
 Each subflow has a \ac{dss} negotiated via the \ac{mptcp} option subtype
 \texttt{DSS}, which maps subflow sequence numbers to data sequence numbers. Data
-is acknowledged both at the subflow level (via the \texttt{SYN} flag), and at
+is acknowledged both at the subflow level (via the \texttt{ACK} flag), and at
 the data level (via a flag within the \ac{dss}).
 
 As a result of this flexibility in labeling data with sequence numbers, data may
@@ -284,22 +304,74 @@ implementation.
 
 \section{Detour and Overlay Routing}
 
-Overlay networks are networks constructed on top of an existing ``substrate''
-network. Nodes route traffic among each other using the substrate network rather
-than direct links. Traffic is routed through a sequence of overlay nodes before
-reaching the final destination, rather than being directly routed through the
-substrate. In the case of the Internet, these networks can be advantageous
-because they can add functionality that is not widely deployed (such as
-multicasting) and they can make routing decisions based on more information than
-the Internet.
+Improved Internet routing has been a goal for researchers for a long time.
+However, experimenting with routing on the Internet is not feasible. As the IPv6
+deployment process has demonstrated, network level protocols are not easy to
+change. The Internet Protocol does specify a way to determine the route that
+packets take: the options \ac{lsrr} and \ac{ssrr} \cite{rfc791}. These IP
+options allow the source to specify a partial (Loose) or complete (Strict) route
+consisting of a list of addresses. However, these options are rarely respected
+in practice, because they enable spoofing IP addresses, while still receiving
+reply packets.
+
+An alternative to designing and deploying a full new network layer protocol is
+experimenting on overlay networks. Overlay networks are networks constructed on
+top of an existing ``substrate'' network. Nodes route traffic among each other
+using the substrate network rather than direct links. Traffic is routed through
+a sequence of overlay nodes before reaching the final destination, rather than
+being directly routed through the substrate. In the case of the Internet, these
+networks can be advantageous because they can add functionality that is not
+widely deployed (such as multicasting) and they can make routing decisions based
+on more information than the Internet.
 
 Several overlay network approaches have been proposed and deployed. An early
 example, the M-Bone, connected networks capable of multicasting via tunnels
 \cite{mbone}. This allowed multicasting even though the Internet as a whole did
-not support it. % CONTINUE HERE
+not support it. Later approaches, such as Overcast \cite{jannotti2000overcast},
+apply the concept of overlay networking at the application level to achieve
+similar results.
 
+In \cite{ron}, Andersen \textit{et al.} described \ac{ron}, a framework for
+creating overlay networks and routing traffic along them. Applications link to a
+user-space library, and access the network via a \texttt{send} function and a
+\texttt{recv} callback. Applications may choose to send via the default Internet
+routed path, or via the overlay. Routing is performed at each node, rather than
+at the source. The routing algorithm takes into account several virtual link
+characteristics, as well as application-specified metrics, which are stored in a
+database.
 
-% oTCP
+The design goal of \ac{ron} is to improve reliability by using overlays. The
+result also showed that latency and throughput could be improved via overlays.
+However, as an application-level approach, \ac{ron} cannot be applied to
+unmodified applications. Additionally, while routing tables update quickly in
+response to network outages, they otherwise change slowly and give a single,
+alternative overlay path. It is not possible for applications to use multiple
+overlay paths simultaneously.
+
+In \cite{andersen2003best}, Andersen \textit{et al.} later described a redundant
+routing scheme in which redundant copies of packets are sent along multiple
+paths. They compared this approach with a more traditional approach that reacts
+to link failures and routes around them, similar to the \ac{ron} framework's
+original routing system. However, they did not attempt to use multiple paths
+without redundancy, since their study focused on loss rates rather than
+throughput.
+
+Gummadi \textit{et al.} \cite{gummadi2004improving} demonstrated a simpler
+approach to detour routing. Rather than creating a full overlay network where
+each node monitors links and maintains routing tables, they applied source
+routing. They designed \ac{sosr}, a system which tunnels traffic to an
+intermediary, which then forwards the traffic on to the destination. The
+intermediary performs \ac{nat}, so that reply traffic is forwarded back to the
+destination. Using \ac{sosr} and randomly selected PlanetLab intermediaries,
+they were able to recover from 56\% of failures on the paths to popular web
+servers. However, they did not report the throughput of \ac{sosr} paths.
+
+As far as we could find, there are no overlay routing systems which attempt to
+correct Internet routing inefficiencies by combining multiple paths without
+redundancy. Our system uses \ac{mptcp} to achieve this. It also uses the
+simplified one-hop source routing strategy of Gummadi \textit{et al.}
+\cite{gummadi2004improving} rather than designing an overlay network with a new
+routing system.
 
 \chapter{Implementation}
 \label{c:impl}
