@@ -143,9 +143,9 @@ Routers forward packets along their outgoing interfaces according to an internal
 routing table. This table is populated with routes learned from the external
 \ac{bgp}, as well as intra-\acs{as} protocols such as \ac{ospf}. Administrators
 have considerable freedom to enforce local policy on which routes to advertise,
-and which routes use. Additionally, the metrics used in route selection include
-hop count and \ac{as} count, which may not correlate well with important path
-characteristics.
+and which routes to use. Additionally, the metrics used in route selection
+include hop count and \ac{as} count, which may not correlate well with important
+path characteristics.
 
 As a result, the default Internet path between hosts is not always the ``best
 path'' with respect to characteristics such as latency or loss rate. In
@@ -159,7 +159,7 @@ loss rate, and in nearly half, the packet loss rate improved by a factor of six.
 
 Overlay networks have been proposed as a way to experiment with new routing
 techniques. These techniques create a second network on top of the existing
-Internet. Peers in these overlay are connected by \textit{virtual links}, which
+Internet. Peers in these overlays are connected by \textit{virtual links}, which
 are simply routes in the underlying Internet. Packets are tunneled from peer to
 peer until reaching their end destination. Overlay networks like these have been
 shown to improve on path metrics like throughput and loss rates
@@ -395,8 +395,8 @@ least three hosts:
   the \ac{mptcp} connection.
 \item The \emph{server} is the host with which the client wishes to communicate.
 \item The \emph{detour} is a host which acts as a waypoint along the overlay
-  route from the client to the server. It tunnels the \ac{mptcp} between them. There
-  may be more than one detour at a time.
+  route from the client to the server. It tunnels the \ac{mptcp} connection
+  between them. There may be more than one detour at a time.
 \end{itemize}
 
 We assume only that the server supports Multipath TCP, and require no additional
@@ -448,7 +448,8 @@ The first mechanism involves the open-source tool OpenVPN. Detours run a
 specially configured OpenVPN server. Clients connect to this VPN, creating a
 virtual network device. The client receives a routing rule from the detour
 advertising that it can reach all hosts on the Internet with a very high cost.
-As a result, the client operating system will prefer other routes to the VPN.
+As a result, the client operating system will prefer other routes instead of the
+VPN.
 
 The VPN connection is configured as follows:
 
@@ -459,7 +460,7 @@ The VPN connection is configured as follows:
 \item The initial connection negotiation requires the client and server to
   exchange certificates.
 \item Subsequent messages are not protected by encryption or signatures, to
-  avoid overhead.
+  reduce per-packet space and time overhead.
 \end{itemize}
 
 One important aspect of VPN configuration is that the detour must create a
@@ -641,15 +642,16 @@ address on the client and server.
 The path manager receives space within the \ac{mptcp} control buffer in order to
 track state, and it registers a set of callbacks with the protocol, so that it
 can be notified of events as they occur. Our path manager (named
-\texttt{detour}) runs a worker when a client-side \ac{mptcp} connection becomes fully
-established (i.e. after the three-way handshake completes). The first thing this
-is send a message to userspace, requesting a detour. Then, it looks through an
-internal list of detours. The kernel maintains two lists of detours (per network
-namespace). The first is a list of OpenVPN detours. These detour entries are not
-specific to a server, and they simply indicate the name of a network interface
-to use. The second list contains NAT detours. These consist of a detour address
-and port, and a server address and port. The worker may only select NAT entries
-which match the server address and port of the connection it is working on.
+\texttt{detour}) runs a worker when a client-side \ac{mptcp} connection becomes
+fully established (i.e. after the three-way handshake completes). The first
+thing this does is send a message to userspace, requesting a detour. Then, it
+looks through an internal list of detours. The kernel maintains two lists of
+detours (per network namespace). The first is a list of OpenVPN detours. These
+detour entries are not specific to a server, and they simply indicate the name
+of a network interface to use. The second list contains NAT detours. These
+consist of a detour address and port, and a server address and port. The worker
+may only select NAT entries which match the server address and port of the
+connection it is working on.
 
 The task attempts to add up to $N$ subflows, where $N$ is a configurable limit.
 It terminates in one of two ways. Either it has exhaused all of the available
@@ -670,7 +672,7 @@ connections which match the server address and port are notified.
 \section{Client Daemon}
 
 The client daemon has several responsibilities. First, it must create OpenVPN
-connections report them to the kernel. Second, it must respond to detour
+connections and report them to the kernel. Second, it must respond to detour
 requests from the kernel by creating NAT detours and reporting them back.
 
 The daemon has a configuration file which allows the user to specify the IP
