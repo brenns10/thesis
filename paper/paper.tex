@@ -722,6 +722,26 @@ kernel log all tunnels for diagnostics.
 \chapter{Evaluation}
 \label{c:eval}
 
+The literature has already established that one-hop overlay routes can improve
+connection latency, loss rate, and throughput
+\cite{detour,ron,gummadi2004improving}. Therefore, when designing experiments to
+evaluate our system, we did not attempt to replicate these results. Instead, we
+attempted to answer the following questions:
+
+\begin{itemize}
+\item Given a network where an alternative path with better connection
+  properties exists, can this mechanism effectively use the alternative path?
+\item Given a network where the core is the bottleneck, rather than access
+  links, can this method aggregate the throughput of alternative paths?
+\item Can this mechanism be used effectively on the wide area Internet?
+\end{itemize}
+
+We design two types of experiments to answer each of these questions.
+
+\section{Mininet Experiments}
+
+
+
 \chapter{Future Work and Conclusion}
 \label{c:fwconclude}
 
