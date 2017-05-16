@@ -3,7 +3,21 @@
  * build: make client
  * run: ./client CMD [ARGS ...]
  *
- * TODO: if scalability is required/desired, we need threading
+ * This has grown into a large, complex program. It has commands for sending
+ * one-off messages to the kernel. However its main function is the `daemon`
+ * command, which runs in the background, managing OpenVPN and handling mproxy
+ * detour requests and responses.
+ *
+ * The daemon mode is multithreaded:
+ * - The main thread parses configuration and spawns the other threads. It then
+ *   loops waiting for netlink detour requests. It reads on netlink socket and
+ *   writes on the mproxy sockets.
+ * - The recv_thread listens for mproxy responses and reports them to the
+ *   kernel. This is only thread safe because the detour_manager list is not
+ *   modified during normal operation, and send/recv operations are thread safe
+ *   in POSIX. It reads on mproxy sockets and writes on the netlink socket.
+ * - For each OpenVPN instance there is a managing thread. It captures output
+ *   and logs it, ensuring we don't miss important information.
  */
 
 #include <stdio.h>
@@ -18,6 +32,7 @@
 #include <signal.h>
 #include <wait.h>
 #include <sys/socket.h>
+#include <sys/select.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <regex.h>
@@ -82,6 +97,16 @@ ssize_t indexof(char **arr, size_t nelem, const char *str)
  * Macro for getting the size of a static array.
  */
 #define nelem(arr) (sizeof(arr) / sizeof(arr[0]))
+
+/**
+ * Macro for getting the minimum of two things
+ */
+#define min(x, y) ((x) <= (y) ? (x) : (y))
+
+/**
+ * Macro for getting the maximum of two things
+ */
+#define max(x, y) ((x) > (y) ? (x) : (y))
 
 /**
  * Log levels - messages with level <= the set level are logged. Note similarity
@@ -155,6 +180,7 @@ struct detour_manager {
  * @daemonize: whether or not to fork a new process first
  * @loglevel: filters log entries
  * @log_lock: held by _dc_log function to avoid concurrency. problems caused by
+ * @recv_thread: pthread that listens on UDP sockets for replies
  */
 struct daemon_config {
 	struct vpn_manager *vpns;
@@ -164,6 +190,7 @@ struct daemon_config {
 	int daemonize;
 	int loglevel;
 	pthread_mutex_t log_lock;
+	pthread_t recv_thread;
 };
 
 void _dc_log(struct daemon_config *dc, int level, const char *format, ...)
@@ -399,7 +426,6 @@ int detour_req_echo_cb(struct nl_msg *msg, void *arg)
 
 // forward declarations
 int send_requests(struct daemon_config *dc, struct mproxy_request *req);
-int recv_responses(struct daemon_config *dc);
 
 /**
  * Callback function for DETOUR_C_REQ messages. Parses the message, requests
@@ -437,9 +463,9 @@ int detour_req_create_cb(struct nl_msg *msg, void *arg)
 		return NL_STOP;
 	}
 
-	if (recv_responses(dc)) {
-		return NL_STOP;
-	}
+	/*
+	 * Listening for responses is done in a separate thread.
+	 */
 
 	return NL_STOP;
 }
@@ -466,28 +492,52 @@ int send_requests(struct daemon_config *dc, struct mproxy_request *req)
 }
 
 /**
- * Receive a mproxy response from each UDP socket and forward it to the kernel.
- * This assumes that we will get a response - it is worth adding a timeout here
- * (TODO).
+ * A thread which forever listens for mproxy responses and forwards them to
+ * the kernel. All hail select().
  */
-int recv_responses(struct daemon_config *dc)
+void *recv_responses_thread(void *arg)
 {
-	struct detour_manager *mgr = dc->detours;
+	int nfds = 0;
+	int ret;
+	fd_set fds;
+	struct daemon_config *dc = arg;
+	struct detour_manager *mgr;
 	struct mproxy_request req;
-	pr_info(dc, "waiting for mproxy responses\n");
-	while (mgr) {
-		if (recv(mgr->sk, &req, sizeof(req), 0) != sizeof(req)) {
-			perror("failed to recv mproxy response");
-			return -1;
+	pr_info(dc, "mproxy response thread started\n");
+
+	for (;;) {
+		FD_ZERO(&fds);
+		for (mgr = dc->detours; mgr; mgr = mgr->next) {
+			FD_SET(mgr->sk, &fds);
+			/* nfds is 1 + max(fd) */
+			nfds = max(nfds, mgr->sk + 1);
 		}
-		pr_debug(dc, "received response, sending to kernel\n");
-		detour_add_or_del(dc->sk, &mgr->addr.sin_addr, req.dpt,
-		                  (struct in_addr*)&req.rip, req.rpt,
-		                  DETOUR_C_ADD);
-		pr_debug(dc, "sent.\n");
-		mgr = mgr->next;
+
+		ret = select(nfds, &fds, NULL, NULL, NULL);
+		if (ret < 0) {
+			pr_perror(dc, "in mproxy response thread select:");
+			return NULL;
+		}
+
+		for (mgr = dc->detours; mgr; mgr = mgr->next) {
+			if (!FD_ISSET(mgr->sk, &fds)) {
+				continue;
+			}
+			if (recv(mgr->sk, &req, sizeof(req), 0) != sizeof(req)) {
+				pr_perror(dc, "failed to recv mproxy response");
+				continue; /* next mgr */
+			}
+
+			/* TODO: could verify that the request is a reply to
+			 * a message we sent. */
+
+			pr_debug(dc, "received response, sending to kernel\n");
+			detour_add_or_del(dc->sk, &mgr->addr.sin_addr, req.dpt,
+			                  (struct in_addr*)&req.rip, req.rpt,
+			                  DETOUR_C_ADD);
+			pr_debug(dc, "sent response to kernel\n");
+		}
 	}
-	return 0;
 }
 
 /**
@@ -969,6 +1019,18 @@ int cli_daemon(struct nl_sock *sk, int argc, char *argv[])
 	if (report_vpns(dc)) {
 		goto destroy_dc;
 	}
+	/* start a thread to receive mproxy responses and forward to kernel */
+	if (dc->detours) {
+		rc = pthread_create(&dc->recv_thread, NULL,
+		                    recv_responses_thread, (void*)dc);
+		if (rc != 0) {
+			pr_err(dc, "error %d in pthread_create for "
+			       "recv_responses_thread", rc);
+			rc = -1;
+			goto destroy_dc;
+		}
+
+	}
 	/* now we loop receiving netlink messages */
 	do {
 		rc = nl_recvmsgs_default(sk);
@@ -976,6 +1038,7 @@ int cli_daemon(struct nl_sock *sk, int argc, char *argv[])
 	if (rc < 0) {
 		nl_perror(rc, "nl_recvmsgs");
 	}
+	pthread_kill(dc->recv_thread, SIGTERM);
 destroy_dc:
 	destroy_daemon_config(dc);
 	return rc;
