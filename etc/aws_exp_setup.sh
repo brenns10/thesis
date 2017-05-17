@@ -3,14 +3,15 @@
 cd
 
 export DEBIAN_FRONTEND=noninteractive
+TARNAME=vm.tar
 
 # We'll use the same tarball as the VMs but we won't use the bundled setup.sh
 echo Downloading vm tarball...
-wget -q https://brenns10.keybase.pub/vm.tar.xz
-chmod a+rx vm.tar.xz
+wget -q https://brenns10.keybase.pub/$TARNAME
+chmod a+rx $TARNAME
 chmod a+x .
 echo Extracting vm tarball...
-sudo -u ubuntu tar xf vm.tar.xz -C ~ubuntu
+sudo -u ubuntu tar xf $TARNAME -C ~ubuntu
 
 echo Updating package database...
 apt update -q
