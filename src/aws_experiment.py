@@ -39,6 +39,16 @@ client: {
 }
 '''
 
+VPN_CFG = '''
+client: {
+  detours = [];
+  vpns = ["%s"];
+  daemonize = false;
+  logfile = "daemon-nat.log";
+  loglevel = "DEFAULT";
+}
+'''
+
 # Key Pair Name. Hopefully you named it the same thing in every region.
 KEYPAIR = 'stephen@greed'
 KEYFILE = '/home/stephen/.ssh/id_rsa'
@@ -235,20 +245,24 @@ def run_exp_nat(instances, clients):
     many_iperf(30, client_transport, server_chan, server_output, instances)
 
     # save control server output
-    with open('server1.json', 'wb') as f:
+    with open('server.ctrl.json', 'wb') as f:
         f.write(server_output.getvalue())
 
     # send a client daemon config
     print('Sending over the daemon config...')
     sftp = clients['client'].open_sftp()
     nat_cfg = NAT_CFG % instances['detour'].public_ip_address
+    vpn_cfg = VPN_CFG % instances['detour'].public_ip_address
     sftp.putfo(BytesIO(nat_cfg.encode('utf8')),
                '/home/ubuntu/etc/daemon-nat-aws.conf')
+    sftp.putfo(BytesIO(vpn_cfg.encode('utf8')),
+               '/home/ubuntu/etc/daemon-vpn-aws.conf')
     sftp.close()
 
     # run the client daemon
     print('Starting up the client daemon...')
     client_daemon_chan = client_transport.open_session()
+    client_daemon_chan.get_pty() # so we can SIGHUP it
     client_daemon_chan.set_combine_stderr(True)
     client_daemon_chan.exec_command(
         command='cd src; sudo ./client daemon ../etc/daemon-nat-aws.conf'
@@ -258,7 +272,22 @@ def run_exp_nat(instances, clients):
     many_iperf(30, client_transport, server_chan, server_output, instances)
 
     # save nat server output
-    with open('server2.json', 'wb') as f:
+    with open('server.nat.json', 'wb') as f:
+        f.write(server_output.getvalue())
+
+    # kill the client daemon and start a vpn one
+    client_daemon_chan.close()
+    client_daemon_chan = client_transport.open_session()
+    client_daemon_chan.set_combine_stderr(True)
+    client_daemon_chan.exec_command(
+        command='cd src; sudo ./client daemon ../etc/daemon-vpn-aws.conf'
+    )
+
+    server_output = BytesIO()
+    many_iperf(30, client_transport, server_chan, server_output, instances)
+
+    # save vpn output
+    with open('server.vpn.json', 'wb') as f:
         f.write(server_output.getvalue())
 
     clients['detour'].close()
