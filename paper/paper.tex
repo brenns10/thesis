@@ -785,7 +785,8 @@ although we did not use switches in our experiments.
 Our network topology is illustrated in Figure~\ref{fig:topo}. The routers
 \texttt{r1} through \texttt{r3} are Linux hosts, as described in the previous
 section. They are statically configured with routes, so that the default route
-from \texttt{client} to \texttt{server} traverses Link 2.
+from \texttt{client} to \texttt{server} traverses Link 2. Routing is enabled,
+and all routing occurs within the kernel.
 
 While configuring routing tables, we encountered issues where Linux kernel
 routing rejected incoming packets as ``Martians.'' That is, packets which
@@ -793,10 +794,74 @@ originated from an interface which is not the default route for their source
 address. To avoid these issues, we disabled Martian filtering in the Linux
 kernel.
 
-
-
 \subsection{Methodology}
 
+To evaluate the performance of this mechanism, we vary the traffic control
+configurations of the links in the topology. There are two main traffic control
+configurations tested.
+
+\begin{itemize}
+\item \textbf{Symmetric.} The first configuration gives each link the same
+  traffic control properties: 10Mbps bandwidth and 5ms delay.
+\item \textbf{Core-limited.} The second configuration gives each link within the
+  network ``core'' (i.e. links 2, 4, and 5) 10Mbps of bandwidth and a 5ms delay.
+  Meanwhile, the access links (i.e. links 1, 3, and 6) are assigned 20Mbps, with
+  the same 5ms delay. This aims to provide a simplified configuration in which
+  the access link can support more bandwidth than the default Internet path.
+\end{itemize}
+
+For each traffic control configuration, we also create two modifications.
+
+\begin{itemize}
+\item \textbf{Lossy.} Link 2 is configured to drop packets independently and
+  randomly with probability 0.01.
+\item \textbf{Delayed.} Link 2 is configured to have a high (100ms) latency.
+\end{itemize}
+
+This results in a total of six traffic control configurations. For each traffic
+control configuration, we use the standard IPerf 3 tool to measure \ac{mptcp} or
+TCP throughput between \texttt{client} and \texttt{server}. We test the
+following configurations:
+
+\begin{itemize}
+\item \textbf{1-Subflow.} MPTCP is enabled, but no detours are configured on the
+  client. The connection uses only one subflow, across the Internet routed path.
+\item \textbf{NAT.} A single NAT detour is configured across the \texttt{detour}
+  host.
+\item \textbf{OpenVPN.} A single OpenVPN detour is configured across the
+  \texttt{detour} host.
+\item \textbf{TCP.} MPTCP is disabled. A regular TCP flow is used, across the
+  default Internet routed path. The default Linux congestion control (CUBIC) is
+  used.
+\item \textbf{NAT TCP.} A regular TCP flow is used, but it is directed through
+  the same NAT proxy mechanism used in the \textbf{NAT} configuration.
+\item \textbf{OpenVPN TCP.} A regular TCP flow is used, but it is directed
+  through the same OpenVPN proxy mechanism used in the \textbf{OpenVPN}
+  configuration.
+\end{itemize}
+
+The throughput is measured with IPerf for a total of 60 trials for each
+combination of traffic control and connection configuration. A trial consists of
+a ten-second IPerf session.
+
+\subsection{Results}
+
+% TODO
+
+\section{AWS Experiment}
+
+The Mininet experiments demonstrate that this method can indeed circumvent lower
+quality paths, and also aggregate the capacity of different paths through the
+network. However, these experiments run on a single platform: client, server,
+detour, and routers all share the same network stack. The real Internet is much
+more homogeneous. To demonstrate the feasibility of this mechanism on the wide
+area Internet, we designed a full-scale experiment.
+
+Using Amazon Web Services' Elastic Cloud Compute service (AWS EC2), we deployed
+three instances, each in a different region. The client is located in the
+\texttt{us-west-1} region (Northern California), the detour in
+\texttt{us-east-2} (Ohio), and the server in \texttt{us-east-1} (Northern
+Virginia).
 
 \chapter{Future Work and Conclusion}
 \label{c:fwconclude}
