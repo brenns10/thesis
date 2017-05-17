@@ -44,7 +44,7 @@ client: {
   detours = [];
   vpns = ["%s"];
   daemonize = false;
-  logfile = "daemon-nat.log";
+  logfile = "daemon-vpn.log";
   loglevel = "DEFAULT";
 }
 '''
@@ -222,17 +222,29 @@ def many_iperf(n, client_transport, server_chan, server_output, instances):
     print()
 
 
+def blocking_cmd(ssh, cmd):
+    chan = ssh.open_session()
+    chan.set_combine_stderr(True)
+    chan.exec_command(command=cmd)
+    chan.recv_exit_status()
+
+
 def run_exp_nat(instances, clients):
     detour_transport = clients['detour'].get_transport()
     client_transport = clients['client'].get_transport()
     server_transport = clients['server'].get_transport()
 
     # start detour daemon
-    print('Starting detour daemon...')
+    print('Starting detour nat daemon...')
     detour_chan = detour_transport.open_session()
     detour_chan.set_combine_stderr(True)
     detour_chan.exec_command(command='cd src; sudo ./nat_detour.py')
     print(detour_chan.recv(4096))
+    print('Starting detour vpn daemon...')
+    detour_vpn_chan = detour_transport.open_session()
+    detour_vpn_chan.set_combine_stderr(True)
+    detour_vpn_chan.exec_command(command='cd src; sudo ./vpn_detour.sh')
+    print(detour_vpn_chan.recv(4096))
 
     # start server
     print('Starting iperf server...')
@@ -249,7 +261,7 @@ def run_exp_nat(instances, clients):
         f.write(server_output.getvalue())
 
     # send a client daemon config
-    print('Sending over the daemon config...')
+    print('Sending over the daemon configs...')
     sftp = clients['client'].open_sftp()
     nat_cfg = NAT_CFG % instances['detour'].public_ip_address
     vpn_cfg = VPN_CFG % instances['detour'].public_ip_address
@@ -260,7 +272,7 @@ def run_exp_nat(instances, clients):
     sftp.close()
 
     # run the client daemon
-    print('Starting up the client daemon...')
+    print('Starting up the nat daemon...')
     client_daemon_chan = client_transport.open_session()
     client_daemon_chan.get_pty() # so we can SIGHUP it
     client_daemon_chan.set_combine_stderr(True)
@@ -275,8 +287,18 @@ def run_exp_nat(instances, clients):
     with open('server.nat.json', 'wb') as f:
         f.write(server_output.getvalue())
 
-    # kill the client daemon and start a vpn one
+    # this should close the client daemon, but apparently it doesn't
+    client_daemon_chan.send('\x03') # sigint
     client_daemon_chan.close()
+
+    print('Killing daemon...')
+    blocking_cmd(client_transport, "sudo pkill -f '^./client daemon'")
+    print('Cleaning up NAT entry...')
+    blocking_cmd(client_transport, 'cd src; sudo ./client del %s %d %s %d' %
+                 (instances['detour'].public_ip_address, 5201,
+                  instances['server'].public_ip_address, 5201))
+
+    print('Starting up the openvpn daemon...')
     client_daemon_chan = client_transport.open_session()
     client_daemon_chan.set_combine_stderr(True)
     client_daemon_chan.exec_command(
