@@ -770,6 +770,12 @@ void destroy_daemon_config(struct daemon_config *dc)
  * case, the parent is going to exit immediately after forking anyway, so the
  * second fork (whose purpose is to avoid creating a zombie process when the
  * parent continues running) is unnecessary.
+ *
+ * The other purpose of a second fork is to create a new session with setsid(),
+ * (in the first child), and then fork again, killing the first child. This way
+ * the second child is not the leader of its own session, and it cannot
+ * accidentally acquire a terminal and get terminated by it.
+ * http://stackoverflow.com/questions/881388/what-is-the-reason-for-performing-a-double-fork-when-creating-a-daemon
  */
 void daemonize(void)
 {
