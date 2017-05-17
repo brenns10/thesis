@@ -176,6 +176,8 @@ def setup_nat(net):
     detour.cmd('./nat_detour.py &')
     if is_custom_kernel():
         client.cmd('./client daemon ../etc/daemon-nat-vm.conf')
+        client.cmd('sysctl -w net.ipv4.tcp_congestion_control=lia')
+        server.cmd('sysctl -w net.ipv4.tcp_congestion_control=lia')
     else:
         time.sleep(0.5)
         client.cmd('./request.py %s %s %d %d' % (detour.IP(), server.IP(),
@@ -188,6 +190,8 @@ def setup_vpn(net):
     detour.cmd('./vpn_detour.sh &')
     if is_custom_kernel():
         client.cmd('./client daemon ../etc/daemon-vpn-vm.conf')
+        client.cmd('sysctl -w net.ipv4.tcp_congestion_control=lia')
+        server.cmd('sysctl -w net.ipv4.tcp_congestion_control=lia')
     else:
         client.cmd('openvpn --remote %s 1194 udp --client --dev tun '
                    '--ca ../tmp/ca.crt --cert ../tmp/client1.crt '
