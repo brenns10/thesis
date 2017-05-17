@@ -331,13 +331,14 @@ def scenario(setup_name, params_name, trials=30):
 
 def main():
     parser = argparse.ArgumentParser(description='Mininet experiment harness')
-    parser.add_argument('--params', type=str, default='easy,lossy',
+    parser.add_argument('--params', type=str,
+                        default='easy,lossy,delayed,sym,sym_lossy,sym_delayed',
                         help='comma separated list of params')
     parser.add_argument('--setups', type=str, default='control,nat,vpn',
                         help='comma separated list of setups')
     parser.add_argument('--cli', action='store_true',
                         help='start a cli with the first param and setup')
-    parser.add_argument('--trials', '-t', type=int, default=30)
+    parser.add_argument('--trials', '-t', type=int, default=60)
 
     args = parser.parse_args()
     params = args.params.split(',')
