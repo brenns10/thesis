@@ -228,18 +228,73 @@ SETUP = {
 
 
 def params_easy():
+    """
+    In this scenario, the core links are 10 Mbit while the access links are 20.
+    This means that detour routing could actually aggregate more throughput
+    than a single path could.
+    """
     return BASIC_PARAMS.copy()
 
 
 def params_lossy():
+    """
+    This scenario is similar to 'easy', but there is loss along the default
+    route.
+    """
     d = BASIC_PARAMS.copy()
     d['r1_r2']['loss'] = 1
+    return d
+
+
+def params_delayed():
+    """
+    This scenario is similar to 'easy', but there is a high latency link across
+    the default route.
+    """
+    d = BASIC_PARAMS.copy()
+    d['r1_r2']['delay'] = '100ms'
+    return d
+
+
+def params_sym():
+    """
+    In this scenario, each link has 10 Mbit bandwidth. As a result, there may
+    not be any gain by aggregating paths.
+    """
+    d = BASIC_PARAMS.copy()
+    d['client_r1']['bw'] = 10
+    d['r2_server']['bw'] = 10
+    d['r3_detour']['bw'] = 10
+    return d
+
+
+def params_sym_lossy():
+    """
+    This scenario, based on symmetric, has each link with the same bandwidth.
+    However, the default route is lossy. Thus, the two flows are competing for
+    bandwidth and the alternative subflow needs to make up the total bandwidth.
+    """
+    d = params_symmetric()
+    d['r1_r2']['loss'] = 1
+    return d
+
+
+def params_sym_delayed():
+    """
+    This scenario is based on symmetric, but the default route has high delay.
+    """
+    d = params_symmetric()
+    d['r1_r2']['delay'] = '100ms'
     return d
 
 
 PARAMS = {
     'easy': params_easy,
     'lossy': params_lossy,
+    'delayed': params_delayed,
+    'sym': params_sym,
+    'sym_lossy': params_sym_lossy,
+    'sym_delayed': params_sym_delayed,
 }
 
 
