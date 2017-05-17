@@ -736,10 +736,66 @@ attempted to answer the following questions:
 \item Can this mechanism be used effectively on the wide area Internet?
 \end{itemize}
 
-We design two types of experiments to answer each of these questions.
+We design two types of experiments to answer each of these questions. The first
+is based on network emulation, and is designed to answer the first two questions
+regarding specific network topologies. The second experiment deploys this
+mechanism across geographically distributed hosts, to evaluate the performance
+and deployment potential on the wide area Internet.
 
 \section{Mininet Experiments}
 
+Our first set of experiments is based on the Mininet tool \cite{mininet}.
+Mininet is a software-defined networking tool that allows the creation of
+virtual networks. Networks created within mininet use the native OS network
+stack, and can run applications unmodified using the virtual network.
+
+\subsection{Mininet Operation}
+
+Mininet works by leveraging the lightweight virtualization mechanisms that the
+Linux kernel provides. Within the kernel, \emph{namespaces} are used to organize
+and partition the resources a process (or group of processes) can see and use.
+For instance, mount namespaces limit an application's view of the file system.
+PID namespaces give a group of applications a new set of process identifiers,
+starting from 1. Similarly, network namespaces group the resources of the
+operating system network stack. In particular, network namespaces group network
+interfaces, as well as routing tables and firewall rules.
+
+Network namespaces may be connected by virtual Ethernet pairs, such that traffic
+sent on a virtual interface on within one namespace can be received on a virtual
+interface within another. Furthermore, these virtual Ethernet links may be
+configured using the Linux Traffic Control framework, to emulate packet loss,
+latency, jitter, reordering, retransmission, and control link bandwidth.
+
+Mininet creates virtual networks via the following mechanism
+\cite{lantz2010network}. Each host is a shell process running within a separate
+network namespace. Hosts share a pipe to the Mininet parent process, over which
+commands and output are exchanged. Links are virtual Ethernet pairs. Switches
+may be emulated using userspace or kernel OpenFlow switch implementations,
+although we did not use switches in our experiments.
+
+\subsection{Topology}
+
+\begin{figure}
+  \centering
+  \includegraphics[width=\textwidth]{figures/Topology.pdf}
+  \caption{Experimental network topology}
+  \label{fig:topo}
+\end{figure}
+
+Our network topology is illustrated in Figure~\ref{fig:topo}. The routers
+\texttt{r1} through \texttt{r3} are Linux hosts, as described in the previous
+section. They are statically configured with routes, so that the default route
+from \texttt{client} to \texttt{server} traverses Link 2.
+
+While configuring routing tables, we encountered issues where Linux kernel
+routing rejected incoming packets as ``Martians.'' That is, packets which
+originated from an interface which is not the default route for their source
+address. To avoid these issues, we disabled Martian filtering in the Linux
+kernel.
+
+
+
+\subsection{Methodology}
 
 
 \chapter{Future Work and Conclusion}
