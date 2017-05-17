@@ -274,7 +274,7 @@ def params_sym_lossy():
     However, the default route is lossy. Thus, the two flows are competing for
     bandwidth and the alternative subflow needs to make up the total bandwidth.
     """
-    d = params_symmetric()
+    d = params_sym()
     d['r1_r2']['loss'] = 1
     return d
 
@@ -283,7 +283,7 @@ def params_sym_delayed():
     """
     This scenario is based on symmetric, but the default route has high delay.
     """
-    d = params_symmetric()
+    d = params_sym()
     d['r1_r2']['delay'] = '100ms'
     return d
 
