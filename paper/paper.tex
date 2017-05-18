@@ -826,10 +826,10 @@ following configurations:
 \begin{itemize}
 \item \textbf{1-Subflow.} MPTCP is enabled, but no detours are configured on the
   client. The connection uses only one subflow, across the Internet routed path.
-\item \textbf{NAT.} A single NAT detour is configured across the \texttt{detour}
-  host.
-\item \textbf{OpenVPN.} A single OpenVPN detour is configured across the
-  \texttt{detour} host.
+\item \textbf{NAT.} In addition to a subflow on the Internet routed path, a
+  second subflow is through a NAT detour.
+\item \textbf{OpenVPN.} In addition to a subflow on the Internet routed path, a
+  second subflow is through a OpenVPN detour.
 \item \textbf{TCP.} MPTCP is disabled. A regular TCP flow is used, across the
   default Internet routed path. The default Linux congestion control (CUBIC) is
   used.
@@ -846,7 +846,103 @@ a ten-second IPerf session.
 
 \subsection{Results}
 
-% TODO
+\begin{figure}
+  \centering
+  \includegraphics{figures/sym.pdf}
+  \caption{Throughput Comparison: Symmetric}
+  \label{fig:sym}
+\end{figure}
+
+Figure~\ref{fig:sym} shows a performance comparison of the mechanism on the
+Symmetric network without loss or latency. In this comparison, we can see three
+important conclusions. First, splitting the traffic across two paths when the
+bottleneck is shared results in more overhead and lower throughput. Second,
+\ac{mptcp} with a single subflow shows more variable throughput behavior than
+regular TCP. Third, regular TCP over the NAT detour demonstrates slightly higher
+throughput than regular TCP over the VPN, although the difference is small (0.5
+Mbps).
+
+\begin{figure}
+  \centering
+  \includegraphics{figures/sym_lossy.pdf}
+  \caption{Throughput Comparison: Symmetric, with Loss}
+  \label{fig:sym_lossy}
+\end{figure}
+
+In Figure~\ref{fig:sym_lossy}, we see the effect of adding a 1\% loss rate to
+a link that is present only on the default path. Regular TCP and \ac{mptcp} with
+one subflow show significant losses in throughput, although \ac{mptcp} is much
+worse. When NAT or VPN paths are added to the \ac{mptcp} connection, the
+performance is comparable to regular TCP traveling solely across those paths,
+but no better.
+
+\begin{figure}[p]
+  \centering
+  \includegraphics[height=0.42\textheight]{figures/sym_delayed.pdf}
+  \caption{Throughput Comparison: Symmetric, with Latency}
+  \label{fig:sym_delayed}
+\end{figure}
+
+\begin{figure}[p]
+  \centering
+  \includegraphics[height=0.42\textheight]{figures/timegrid_sym_delayed.pdf}
+  \caption[Throughput Over Time: Symmetric, with Latency]{Throughput Over Time:
+    Symmetric, with Latency. Units are Mbps on the y-axis and seconds along the
+    x-axis.}
+  \label{fig:timegrid_sym_delayed}
+\end{figure}
+
+In Figure~\ref{fig:sym_delayed}, we see the impact of the high latency link
+along the default route. While it appears that there could be a somewhat
+significant difference between the throughput, this is not the case.
+Figure~\ref{fig:timegrid_sym_delayed} shows the throughput over time for
+each of the experiments. Each of the experiments reaches nearly the same steady
+state throughput, but at different times. This is most likely explained by the
+different congestion control mechanisms used (CUBIC for regular TCP, versus the
+Linked Increases algorithm used by \ac{mptcp}).
+
+\begin{figure}[p]
+  \centering
+  \includegraphics[height=0.45\textheight]{figures/easy.pdf}
+  \caption{Throughput Comparison: Core-limited}
+  \label{fig:easy}
+\end{figure}
+
+\begin{figure}[p]
+  \centering
+  \includegraphics[height=0.45\textheight]{figures/lossy.pdf}
+  \caption{Throughput Comparison: Core-limited, with Loss}
+  \label{fig:lossy}
+\end{figure}
+
+The results for the core-limited network are much different.
+Figure~\ref{fig:easy} shows a comparison of throughput on the core-limited
+network, with no loss or latency. Since the detour path traverses different core
+links than the default path, there is no competition. Thus there is the
+potential to aggregate the capacity of both paths. Both the NAT and VPN methods
+are able to aggregate nearly all of the capacity, although the NAT performs very
+slightly better.
+
+When loss is introduced, Figure~\ref{fig:lossy} shows that the NAT and VPN
+methods outperform their pure TCP variants, since they are able to aggregate the
+throughput of both paths. Even though the default path is lossy, it is able to
+contribute some throughput to the \ac{mptcp} connection.
+
+\subsection{Summary}
+
+By emulating a network with varying conditions, we were able to examine how this
+mechanism can aggregate throughput in different situations. When the mechanism
+is used in a network with no traffic quality issues and no potential for
+aggregation, there is a modest overhead. In a similar network with poor
+connection characteristics along the default path, the mechanism is capable of
+achieving throughput similar to a single flow across an alternative path.
+When the network has potential for aggregation, the mechanism is capable if
+aggregating nearly all of the available throughput. This results in better
+performance than a single flow across any available path.
+
+Across all the connections, the NAT approach performs slightly better than the
+VPN, likely due to the additional overhead of the IP and UDP encapsulation,
+along with any OpenVPN protocol overhead.
 
 \section{AWS Experiment}
 
