@@ -36,6 +36,14 @@ def get_numpy_array(filename):
     return np.array(list(objects_to_bps(json_parse(filename))))
 
 
+def time_series(obj):
+    return np.array([o['sum']['bits_per_second'] for o in obj['intervals']]) / 1000000
+
+
+def get_time_series_arrays(filename):
+    return list(map(time_series, json_parse(filename)))
+
+
 def plot_comparison(name):
     mptcp_ctrl = get_numpy_array('%s.control.mptcp.json' % name) / 1000000
     mptcp_nat = get_numpy_array('%s.nat.mptcp.json' % name) / 1000000
