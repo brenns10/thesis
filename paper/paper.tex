@@ -1009,6 +1009,47 @@ as a PKI root, they may ensure that only members of the collective could use
 their detouring services. By having their private key signed, users could gain
 access to the detouring services of other members.
 
+\section{Dynamic Source Routing}
+
+In the \ac{ron} system, overlay routing is performed at each node \cite{ron}.
+Similarly, the Detour study describes a system in which routing is performed at
+each overlay node \cite{detour}. In this system, we apply source routing. While
+overlay routing mechanisms have been described for systems like \ac{ron} and
+Detour, we are unaware of algorithms which attempt to find the best route for a
+packet from its source, with incomplete knowledge of the capacity and state of
+the network links.
+
+An interesting extension to this work would be to extend it with such an
+algorithm. This algorithm would maintain several \ac{mptcp} subflows, and every
+so often it would decide to close one in favor of a new route. This decision
+would have to take into account at least the following factors:
+
+\begin{itemize}
+\item RTT and observed loss rate of the subflow considered for eviction.
+\item Change in RTT and observed loss rate of the other subflows since this one
+  was added.
+\item Potentially outside observations, such as statistics from other subflows,
+  or statistics generated from userspace monitoring programs.
+\end{itemize}
+
+Together with a Detour Collective, this could almost completely automate the
+process of using this framework for an end user.
+
+\section{Data Scheduling}
+
+The kernel modifications of this framework currently only consist of a path
+manager. We have no control of the scheduling of data across the subflows we've
+created, beyond selecting an appropriate scheduler. An extension of this work
+could be to implement a data scheduler for the framework. A custom scheduler
+could send data redundantly across new subflows just after they are added, so
+that there is no loss in reliability when assessing the performance of a new
+subflow. Further, a scheduler could detect whether a particular flow is
+application limited or network limited, and schedule differently based on this.
+For instance, redundantly sending data across each subflow could improve overall
+latency and loss rates, but it would only make sense when the connection is
+application limited. A network limited connection would be best served by a less
+wasteful strategy, such as the default Lowest RTT First scheduler.
+
 \chapter{Conclusion}
 \label{c:conclusion}
 
