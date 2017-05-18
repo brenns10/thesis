@@ -29,6 +29,8 @@ import boto3
 import paramiko
 
 
+TRIALS = 100
+
 NAT_CFG = '''
 client: {
   detours = ["%s"];
@@ -254,7 +256,7 @@ def run_exp_nat(instances, clients):
 
     # run iperf several times, recv()ing server output
     server_output = BytesIO()
-    many_iperf(30, client_transport, server_chan, server_output, instances)
+    many_iperf(TRIALS, client_transport, server_chan, server_output, instances)
 
     # save control server output
     with open('server.ctrl.json', 'wb') as f:
@@ -281,7 +283,7 @@ def run_exp_nat(instances, clients):
     )
 
     server_output = BytesIO()
-    many_iperf(30, client_transport, server_chan, server_output, instances)
+    many_iperf(TRIALS, client_transport, server_chan, server_output, instances)
 
     # save nat server output
     with open('server.nat.json', 'wb') as f:
@@ -306,7 +308,7 @@ def run_exp_nat(instances, clients):
     )
 
     server_output = BytesIO()
-    many_iperf(30, client_transport, server_chan, server_output, instances)
+    many_iperf(TRIALS, client_transport, server_chan, server_output, instances)
 
     # save vpn output
     with open('server.vpn.json', 'wb') as f:
