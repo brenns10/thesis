@@ -950,14 +950,34 @@ The Mininet experiments demonstrate that this method can indeed circumvent lower
 quality paths, and also aggregate the capacity of different paths through the
 network. However, these experiments run on a single platform: client, server,
 detour, and routers all share the same network stack. The real Internet is much
-more homogeneous. To demonstrate the feasibility of this mechanism on the wide
+more heterogeneous. To demonstrate the feasibility of this mechanism on the wide
 area Internet, we designed a full-scale experiment.
 
 Using Amazon Web Services' Elastic Cloud Compute service (AWS EC2), we deployed
 three instances, each in a different region. The client is located in the
 \texttt{us-west-1} region (Northern California), the detour in
 \texttt{us-east-2} (Ohio), and the server in \texttt{us-east-1} (Northern
-Virginia).
+Virginia). We then ran the IPerf 3 tool for 100 trials in each of the following
+configurations: \textbf{1-Subflow}, \textbf{NAT}, and \textbf{OpenVPN}.
+
+\begin{figure}
+  \centering
+  \includegraphics{figures/aws.pdf}
+  \caption{Throughput Comparison: AWS}
+  \label{fig:aws}
+\end{figure}
+
+Figure~\ref{fig:aws} shows a comparison of the throughput for each of these
+connections. It is clear from this figure that adding a detour was not effective
+in improving throughput. However, it is clear that our mechanism is capable of
+functioning on the wide-area Internet, at higher transmission rates than we
+emulated in the Mininet experiments.
+
+Another interesting result of this experiment is that the OpenVPN mechanism,
+which performed slightly worse than the NAT mechanism in our Mininet tests,
+slightly outperforms the NAT mechanism. Due to the wide variability in the data,
+it is not clear whether this result is due to noise or due to an underlying
+aspect of the mechanism.
 
 \chapter{Future Work and Conclusion}
 \label{c:fwconclude}
