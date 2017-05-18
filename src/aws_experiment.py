@@ -18,6 +18,7 @@ Prerequisites:
 
 """
 import collections
+import os
 import sys
 from io import BytesIO
 from os.path import abspath
@@ -52,8 +53,8 @@ client: {
 '''
 
 # Key Pair Name. Hopefully you named it the same thing in every region.
-KEYPAIR = 'stephen@greed'
-KEYFILE = '/home/stephen/.ssh/id_rsa'
+KEYPAIR = os.getenv('KEYPAIR') or 'stephen@greed'
+KEYFILE = os.getenv('KEYFILE') or '/home/stephen/.ssh/id_rsa'
 
 # The filename of the AWS setup script.
 SETUP_SCRIPT = join(dirname(abspath(__file__)), '../etc/aws_exp_setup.sh')
