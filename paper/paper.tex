@@ -982,6 +982,33 @@ aspect of the mechanism.
 \chapter{Future Work}
 \label{c:fw}
 
+The mechanism described here is complete, but has the potential for improvement
+in several avenues. In this chapter, we describe several possible avenues for
+continued work and research.
+
+\section{Detour Collective}
+
+One fundamental question regarding the deployment of this mechanism has not yet
+been addressed: where are detour hosts found, and what is their motivation for
+forwarding traffic? One possibility is that a group of users could form a group
+that aims to help each other improve their connection quality. Some form of
+protocol, either centralized or decentralize, could allow users to join,
+offering their computer as a detour, in return for the use of other detour
+hosts.
+
+Ultimately, this group would be very similar to the overlay networks described
+previously. However, unlike most of these, the overlay network would be
+restricted to single hop source routing of \ac{mptcp} connections.
+
+The VPN detouring mechanism would be particularly conducive to such a
+collective. The OpenVPN protocol uses a PKI for authentication of client and
+server. So, a centralized collective could use this PKI to enforce membership
+cryptographically. When a user joins, they generate a private key and request
+that the central authority sign it. By using the central authority's certificate
+as a PKI root, they may ensure that only members of the collective could use
+their detouring services. By having their private key signed, users could gain
+access to the detouring services of other members.
+
 \chapter{Conclusion}
 \label{c:conclusion}
 
