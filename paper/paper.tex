@@ -1050,9 +1050,45 @@ latency and loss rates, but it would only make sense when the connection is
 application limited. A network limited connection would be best served by a less
 wasteful strategy, such as the default Lowest RTT First scheduler.
 
+\section{IP Options}
+
+Currently, the NAT forwarding mechanism uses a UDP-based protocol for requesting
+tunnels. As a result, there is a one RTT overhead before each NAT detour may be
+established. However, the NAT tunnel has lower overhead than the VPN method, and
+thus performs measurably better. Removing the one RTT delay could make the NAT
+method the best overall choice.
+
+It may be possible to embed the final destination of the initial \texttt{SYN}
+packet into an IP option. This would eliminate the need for a signaling
+protocol. This would require implementing a Netfilter module for the detour
+host's kernel.
+
 \chapter{Conclusion}
 \label{c:conclusion}
 
+In this thesis, we have described the implementation and evaluation of a system
+for adding non-default paths to \ac{mptcp} connections. We implemented this as a
+path manager in the 0.91 version of the Multipath TCP Linux kernel, along with
+several user-space utilities which complete the system.
+
+The implementation is structured so that two different mechanisms for tunneling
+subflows are allowed. We have seen that the NAT approach has slightly better
+performance due to its lower per-packet overhead. However, that increased
+performance comes at the expense of an extra RTT for setting up a tunnel, and
+the extra complexity of a dynamic client which creates them. The VPN approach is
+simpler, but has higher overhead.
+
+When compared to standard TCP over the best available path, this mechanism
+incurs a modest overhead when the same bottleneck link is present on both paths.
+However, when the paths have separate bottlenecks, this mechanism is capable of
+aggregating the bandwidth of both paths, achieving better performance than
+standard TCP across the best path.
+
+This mechanism is compatible with the wide area Internet today. We believe that
+as high-bandwidth access links become more common, the collaborative bandwidth
+sharing systems this enables will become more relevant. In the meantime, there
+are several opportunities for extending this work and using it to study problems
+like detour routing.
 
 \backmatter
 \appendix
