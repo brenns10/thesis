@@ -69,6 +69,26 @@
   short = NAT,
   long  = Network Address Translation
 }
+\DeclareAcronym{ecmp}{
+  short = ECMP,
+  long  = Equal Cost Multi-Path Routing
+}
+\DeclareAcronym{lia}{
+  short = LIA,
+  long  = Linked Increase Algorithm
+}
+\DeclareAcronym{olia}{
+  short = OLIA,
+  long  = Opportunistic Linked Increase Algorithm
+}
+\DeclareAcronym{wvegas}{
+  short = wVegas,
+  long  = Delay-based Congestion Control
+}
+\DeclareAcronym{balia}{
+  short = BALIA,
+  long  = Balanced Linked Adaptation Algorithm
+}
 
 \begin{document}
 \advisor{Michael Rabinovich}
@@ -194,19 +214,21 @@ advantage of multiple paths.
 
 The contributions of this thesis are as follows:
 \begin{itemize}
-\item A system of kernel modifications and user-space tools that allow
+\item A system of Linux kernel modifications and user-space tools that allow
   alternative routes to be added to \ac{mptcp} connections.
-\item An evaluation of the method on simulated and real world networks.
+\item An evaluation of the method on emulated and real world networks.
 \end{itemize}
 
-The remainder of this thesis will follow the following structure. Background and
-related work are discussed in Chapter~\ref{c:bgrw}. The implementation of our
-system is described in Chapter~\ref{c:impl}. Experimental evaluation is
-presented in Chapter~\ref{c:eval}. Finally, future work is discussed in
-Chapter~\ref{c:fw} and we conclude in Chapter~\ref{c:conclusion}.
+The remainder of this thesis will follow the following structure. Background
+information on \ac{mptcp} and the mechanisms used in the implementation is
+covered in Chapter~\ref{c:bg}. Related work is discussed in Chapter~\ref{c:rw}.
+The implementation of our system is described in Chapter~\ref{c:impl}.
+Experimental evaluation is presented in Chapter~\ref{c:eval}. Finally, future
+work is discussed in Chapter~\ref{c:fw} and we conclude in
+Chapter~\ref{c:conclusion}.
 
-\chapter{Background and Related Work}
-\label{c:bgrw}
+\chapter{Background}
+\label{c:bg}
 
 \section{Multipath TCP}
 % Our discussion of Multipath TCP needs to be in enough depth that the reader
@@ -222,21 +244,60 @@ Chapter~\ref{c:fw} and we conclude in Chapter~\ref{c:conclusion}.
 Recently, multi-homed devices have become increasingly common. The most obvious
 example of these devices is the smartphone, which typically comes with at least
 two network interfaces: one for cellular data, and one for Wi-Fi. While these
-devices have become more common, most Internet protocols do not have ways to
-take advantage of multiple interfaces.
+devices have become more common, protocols have not kept up. Most Internet
+traffic is carried on TCP, which identifies a data stream by the 5-tuple of
+protocol, source address and port, and destination address and port. As a
+result, multi-homed devices are forced to choose only one interface for a TCP
+session \cite{raiciu2012hard}. \ac{mptcp} was designed as a protocol extension
+to TCP, which allows multiple interfaces (and as a result, network paths) to be
+used in the same TCP stream.
 
-\ac{mptcp} is an extension to TCP which aims to mitigate this problem. It is
-designed with the following goals in mind \cite{rfc6824}.
+\subsection{Design Considerations}
+
+\ac{mptcp} has several design goals, outlined in \cite{rfc6182}. At a high
+level, it aims to use the existence of multiple paths to improve efficiency and
+resiliency of standard TCP. Other transport protocols support this, such as SCTP
+with Concurrent Multipath Transfer \cite{iyengar2006concurrent}. However, SCTP
+cannot easily be used as a replacement for TCP, because applications would
+require modification, and some NATs and firewalls do not support SCTP
+\cite{barre2011multipath}. As a result, \ac{mptcp} also aims to be compatible
+with the Internet today, so it can be deployed widely.
+
+\ac{mptcp}'s design focuses on two types of compatibility, which motivate many
+of its high-level design decisions. First, application compatibility: \ac{mptcp}
+must be usable by existing TCP applications without modification. Second,
+network compatibility: \ac{mptcp} must be usable across the Internet today,
+including across features of the modern Internet such as NAT, firewalls, traffic
+normalizers, and performance-enhancing proxies (collectively referred to as
+middleboxes). In the design of \ac{mptcp}, consideration is made for the
+following types of disruption by middleboxes \cite{rfc6182}:
 
 \begin{itemize}
-  \item To improve both the throughput and reliability of connections, relative
-    to normal TCP.
-  \item To remain compatible with applications that use TCP, so that they could
-    use \ac{mptcp} without modification.
-  \item To remain compatible with the Internet as a whole, especially with
-    ``middleware'' such as firewalls, proxies, and NATs.
+\item Home routers often perform NAT, and so addresses may not be the same on
+  either side of a connection.
+\item Some NAT boxes will additionally rewrite content of some protocols, such
+  as URLs in HTTP \cite{rfc6182} and IP addresses and ports in FTP
+  \cite{raiciu2012hard}.
+\item Some middleboxes perform sequence number randomization.
+\item Some middleboxes strip unrecognized options from packets.
+\item Some middleboxes (especially traffic normalizers) will not allow ``holes''
+  in TCP sequence numbers.
+\item TCP segments may be broken up (for example, segmentation offload) or
+  coalesced. TCP options on these segments must be constructed in a way that
+  this process will not make the data uninterpretable.
 \end{itemize}
-% https://tools.ietf.org/html/rfc6182#section-2
+
+Finally, an additional network compatibility requirement is that \acl{mptcp}
+``do no harm'' to existing TCP flows \cite{rfc6182}. As a result, several
+congestion control mechanisms are proposed, aiming to prevent \ac{mptcp} from
+using more resources than a single TCP flow would across a shared bottleneck
+\cite{rfc6356,draft-olia,draft-balia,draft-wvegas}.
+
+These combined architectural guidelines not only make \ac{mptcp} suitable for
+deployment, but they also make it more resilient to the mechanisms used in this
+thesis (such as NAT) to extend it in new ways.
+
+\subsection{Architecture}
 
 \begin{figure}[h]
   \centering
@@ -257,50 +318,83 @@ designed with the following goals in mind \cite{rfc6824}.
 \end{figure}
 
 To achieve these goals, \ac{mptcp} is located between TCP and the application
-layer, as shown in Figure~\ref{fig:layers}. To applications which aren't aware
-of \ac{mptcp}, the interface is exactly the same as TCP, accessed through the
-same socket operations and interface.
+layer, as shown in Figure~\ref{fig:layers}. While a naive approach would simply
+send different segments on different paths, this would create ``sequence
+number holes'' from the perspective of middleboxes \cite{raiciu2012hard}. To
+remain compatible, a ``subflow'' is created along each path. Each subflow looks
+like a normal TCP connection, but with some additional options, and slightly
+different semantics.
 
-A \ac{mptcp} connection begins similarly to a TCP connection, but with the
-addition of the TCP option with subtype \texttt{MP\_CAPABLE}. Additional TCP
-connections (referred to as ``subflows'') may be created between the two hosts
-once the initial one is established, using the \ac{mptcp} option subtype
-\texttt{MP\_JOIN}.
+A \ac{mptcp} connection begins with a three-way handshake, similar to a regular
+TCP connection. If both hosts are capable and willing to use \ac{mptcp}, they
+include a TCP option with subtype \texttt{MP\_CAPABLE} on all packets of the
+handshake. Additional TCP connections (referred to as ``subflows'') may be
+created between the two hosts once the initial one is established, using the
+\ac{mptcp} option subtype \texttt{MP\_JOIN}. To authenticate this process, keys
+are exchanged via the \texttt{MP\_CAPABLE} option, and a token is verified using
+these keys for each new subflow via the \texttt{MP\_JOIN} option.
+
+An implementation may establish a new subflow with its peer at any time
+according to local policy. Additional addresses may be explicitly advertised
+using the \ac{mptcp} option subtype \texttt{ADD\_ADDR}, and they may be removed
+via the \ac{mptcp} option subtype \texttt{REMOVE\_ADDR}. These options are not
+reliably transmitted, so they are purely informational. While either side of a
+connection may initiate a new subflow, it is expected that the client (i.e.
+active opener) initiate most subflows, due to firewalls and NAT.
 
 Data has sequence numbers at both the subflow level and at the connection level.
 Each subflow has a \ac{dss} negotiated via the \ac{mptcp} option subtype
-\texttt{DSS}, which maps subflow sequence numbers to data sequence numbers. Data
-is acknowledged both at the subflow level (via the \texttt{ACK} flag), and at
-the data level (via a flag within the \ac{dss}).
+\texttt{DSS}, which maps subflow sequence numbers to data sequence numbers.
+These mappings are valid for only a certain amount of bytes, and thus new
+mappings must be transmitted periodically. As a result, the \ac{dss} is one
+persistent form of overhead in the protocol header. Data is acknowledged both
+at the subflow level (via the \texttt{ACK} flag), and at the data level (via a
+flag within the \ac{dss}).
 
-As a result of this flexibility in labeling data with sequence numbers, data may
-be split up across multiple subflows, or even transmitted redundantly. In the
-Linux kernel implementation, determining how data should be split up is the job
-of a modular component called a scheduler \cite{mptcp}. The default scheduler
-implementation selects the subflow with the smallest RTT and fills up its
-congestion window. Other implementations include a naive round-robin scheduler
-and one which sends data redundantly across each subflow. Additional schedulers
-have been proposed, to mitigate problems such as head-of-line blocking and
-bufferbloat \cite{paasch2014experimental}. In this thesis, we consider only the
-Lowest-RTT First scheduler.
+\subsection{Implementation}
 
-An implementation may establish a new subflow with its peer at any time, using
-the same address, or using a new one. Additional addresses may be passively
-advertised using the \ac{mptcp} option subtype \texttt{ADD\_ADDR}, and they may
-be removed via the \ac{mptcp} option subtype \texttt{REMOVE\_ADDR}. These
-options are not reliably transmitted, so they are purely informational. While
-either side of a connection may initiate a new subflow, it is expected that the
-client initiate most subflows.
+\ac{mptcp} is implemented in the Linux kernel, as well as within the XNU kernel
+used by Mac OS and iOS. In this thesis, we focus on version 0.91 of the Linux
+kernel implementation \cite{mptcp}. This implementation has three key features
+which enable flexibility and custom policy: data schedulers, congestion control,
+and path managers.
 
-In order to decide when to create and destroy new subflows, the Linux
-implementation uses another modular component called a ``path manager''
-\cite{mptcp}. The default implementation does nothing (except accepting incoming
-connections). The Linux implementation also includes an \texttt{ndiffports} path
-manager, which initiates up to $N$ subflows with a server, from different source
-ports. A \texttt{fullmesh} path manager establishes subflows between every pair
-of client addresses and advertised server addresses. A major part of the
-implementation of this thesis is a path manager for the Linux kernel \ac{mptcp}
-implementation.
+As a result of \ac{mptcp}'s flexibility in labeling data with sequence numbers,
+data may be split up across multiple subflows, or even transmitted redundantly.
+A data scheduler is a modular component which determines which subflow to send
+application data on. The default scheduler implementation, Lowest RTT First,
+selects the subflow with the smallest RTT and fills up its congestion window.
+Other implementations include a naive round-robin scheduler and one which sends
+data redundantly across each subflow. Additional schedulers have been proposed,
+to mitigate problems such as head-of-line blocking and bufferbloat
+\cite{paasch2014experimental}. In this thesis, we consider only the Lowest RTT
+First scheduler.
+
+As with regular TCP congestion control, \ac{mptcp} congestion control is
+implemented as a modular component of the Linux kernel. While normal TCP
+congestion control algorithms (such as the Linux default, CUBIC) may be used on
+each subflow, several \ac{mptcp} specific implementations are provided: \ac{lia}
+\cite{rfc6356}, \ac{olia} \cite{draft-olia}, \ac{wvegas} \cite{draft-wvegas},
+and \ac{balia} \cite{draft-balia}. In this thesis, we only consider \ac{lia}
+congestion control.
+
+In order to decide when to create and destroy new subflows, as well as advertise
+alternative addresses, the Linux implementation uses another modular component
+called a ``path manager'' \cite{mptcp}. The default implementation does nothing
+(except accepting incoming connections). The Linux implementation also includes
+an \texttt{ndiffports} path manager, which initiates up to $N$ subflows with a
+server, from different source ports. This path manager can be useful for
+\ac{ecmp}, which will be discussed shortly. A \texttt{fullmesh} path manager
+establishes subflows between every pair of client addresses and advertised
+server addresses. A major part of the implementation of this thesis is a path
+manager for the Linux kernel \ac{mptcp} implementation.
+
+% Netfilter and Netlink?
+% OpenVPN?
+
+
+\chapter{Related Work}
+\label{c:rw}
 
 \section{Detour and Overlay Routing}
 
@@ -372,6 +466,7 @@ redundancy. Our system uses \ac{mptcp} to achieve this. It also uses the
 simplified one-hop source routing strategy of Gummadi \textit{et al.}
 \cite{gummadi2004improving} rather than designing an overlay network with a new
 routing system.
+
 
 \chapter{Implementation}
 \label{c:impl}
