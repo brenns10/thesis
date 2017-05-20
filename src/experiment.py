@@ -55,12 +55,13 @@ class DetourTopo(Topo):
         Topo.__init__(self)
 
         # Add hosts and switches
-        client = self.addHost('client')
-        r1 = self.addHost('r1')
-        r2 = self.addHost('r2')
-        server = self.addHost('server')
-        r3 = self.addHost('r3')
-        detour = self.addHost('detour')
+        cpu = 0.1
+        client = self.addHost('client', cpu=cpu)
+        r1 = self.addHost('r1', cpu=cpu)
+        r2 = self.addHost('r2', cpu=cpu)
+        server = self.addHost('server', cpu=cpu)
+        r3 = self.addHost('r3', cpu=cpu)
+        detour = self.addHost('detour', cpu=cpu)
 
         # Add links
         self.addLink(client, r1, **params.get('client_r1', {}))
