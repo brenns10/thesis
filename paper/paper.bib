@@ -154,6 +154,22 @@ RFC Citations. I try to generate the BibTeX from IETF Datatracker.
 	abstract =	{Because of the lack of Multipath TCP (MPTCP) support at the server side, some service providers now consider a network-assisted model that relies upon the activation of a dedicated function called MPTCP Conversion Point (MCP). Network-Assisted MPTCP deployment models are designed to facilitate the adoption of MPTCP for the establishment of multi-path communications without making any assumption about the support of MPTCP by the communicating peers. MCPs located in the network are responsible for establishing multi-path communications on behalf of endpoints, thereby taking advantage of MPTCP capabilities to achieve different goals that include (but are not limited to) optimization of resource usage (e.g., bandwidth aggregation), of resiliency (e.g., primary/backup communication paths), and traffic offload management. This document specifies extensions for Network-Assisted MPTCP deployment models.},
 }
 
+@techreport{draft-segment-routing,
+	number =	{draft-ietf-6man-segment-routing-header-06},
+	type =		{Internet-Draft},
+	institution =	{Internet Engineering Task Force},
+	publisher =	{Internet Engineering Task Force},
+	note =		{Work in Progress},
+	url =		{https://datatracker.ietf.org/doc/html/draft-ietf-6man-segment-routing-header-06},
+	author =	{Stefano Previdi and Clarence Filsfils and Brian Field and Ida Leung and J. Linkova and Ebben Aries and Tomoya Kosugi and Eric Vyncke and David Lebrun and John Leddy and Kamran Raza and daniel.voyer@bell.ca and daniel.bernier@bell.ca and Satoru Matsushima and Dirk Steinberg and Robert Raszuk},
+	title =		{{IPv6 Segment Routing Header (SRH)}},
+	pagetotal =	35,
+	year =		2017,
+	month =		mar,
+	day =		13,
+	abstract =	{Segment Routing (SR) allows a node to steer a packet through a controlled set of instructions, called segments, by prepending an SR header to the packet. A segment can represent any instruction, topological or service-based. SR allows to enforce a flow through any path (topological, or application/service based) while maintaining per-flow state only at the ingress node to the SR domain. Segment Routing can be applied to the IPv6 data plane with the addition of a new type of Routing Extension Header. This draft describes the Segment Routing Extension Header Type and how it is used by SR capable nodes.},
+}
+
 
 Paper Citations:
 
@@ -375,4 +391,28 @@ Paper Citations:
   pages={253--264},
   year={2012},
   organization={ACM}
+}
+
+@article{duncanson1994inverse,
+  author={J. Duncanson},
+  journal={IEEE Communications Magazine},
+  title={Inverse multiplexing},
+  year={1994},
+  volume={32},
+  number={4},
+  pages={34-41},
+  keywords={data communication equipment;digital communication systems;multiplexing;multiplexing equipment;protocols;telecommunication equipment;corporate networking;customer premises-based equipment;high-speed data networking;inverse multiplexing;multimegabit-per-second digital connections;Asynchronous transfer mode;Bandwidth;Communication switching;Computer networks;Data communication;Fabrics;Modems;Switches;Telephony;Time division multiplexing},
+doi={10.1109/35.275333},
+  ISSN={0163-6804},
+  month={April}
+}
+
+@inproceedings{chiussi1998generalized,
+  title={Generalized inverse multiplexing of switched ATM connections},
+  author={Chiussi, Fabio M and Khotimsky, Denis A and Krishnan, Santosh},
+  booktitle={Global Telecommunications Conference, 1998. GLOBECOM 1998. The Bridge to Global Integration. IEEE},
+  volume={5},
+  pages={3134--3140},
+  year={1998},
+  organization={IEEE}
 }

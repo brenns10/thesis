@@ -444,17 +444,60 @@ experiments.
 \chapter{Related Work}
 \label{c:rw}
 
-\section{Detour and Overlay Routing}
+The mechanism in this thesis involves adding alternative routes to a connection,
+in order to improve connection performance. This can be seen as related to
+several concepts in the body of networking research: multipath routing, overlay
+routing, source routing, channel bonding, and proxying. In this chapter, we will
+examine related work at each relevant level of Internet.
 
-Improved Internet routing has been a goal for researchers for a long time.
-However, experimenting with routing on the Internet is not feasible. As the IPv6
-deployment process has demonstrated, network level protocols are not easy to
-change. The Internet Protocol does specify a way to determine the route that
-packets take: the options \ac{lsrr} and \ac{ssrr} \cite{rfc791}. These IP
-options allow the source to specify a partial (Loose) or complete (Strict) route
-consisting of a list of addresses. However, these options are rarely respected
-in practice, because they enable spoofing IP addresses, while still receiving
-reply packets.
+\section{Link Layer}
+
+At the link layer, aggregating multiple low-capacity links to create a single,
+virtual link with higher capacity is called \emph{inverse multiplexing}, or
+sometimes channel bonding \cite{duncanson1994inverse}. Linux provides a bonding
+driver which allows this to be done in software, presenting a single virtual
+interface to the host machine. Unfortunately, this mechanism typically requires
+identical links and configuration on either side of them, limiting the use of
+these setups \cite{chiussi1998generalized}.
+
+Another interesting approach to bandwidth aggregation, falling somewhere between
+the link layer and the network layer, is the ``Beyond One's Bandwidth (BOB)''
+system \cite{radio-agg}. This system, designed for use on residential wireless
+access points, allows neighboring residential access points to share bandwidth.
+Each router negotiates a connection with its neighboring access points, and uses
+round-robin scheduling to assign packet flows to different gateways. Streams,
+like TCP, must remain on the gateway that their initial packet used, so the
+system does not truly aggregate bandwidth for streams. The authors considered
+implementing a \ac{mptcp} proxy with subflows over each gateway, but rejected
+this strategy since it required an egress point on the wide area Internet.
+
+\section{Network Layer}
+
+Improved Internet routing has been a goal for researchers for a long time, and
+the network layer has been a natural place to begin. Related work on the network
+includes source routing, overlay routing schemes, and several multipath routing
+approaches.
+
+\subsection{Source Routing}
+
+A major part of this thesis (and many other studies) involves specifying
+``waypoints'' or detour hosts that a packet must traverse before it continues on
+to its final destination. Although packets are normally routed on the Internet
+hop-by-hop, there are mechanisms for specifying the path that a packet should
+take. In IPv4, these mechanisms are the options \ac{lsrr} and \ac{ssrr}
+\cite{rfc791}. These IP options allow the source of a packet to specify a
+partial (Loose) or complete (Strict) route consisting of a list of addresses. In
+IPv6, a similar mechanism called Segment Routing is being proposed by the IPv6
+Maintenance Working Group of the IETF \cite{draft-segment-routing}. Options like
+these are most useful within a single managed system, since they are not
+respected on the wide area Internet, due to the potential for spoofing IP
+addresses while still receiving reply packets.
+
+\subsection{Overlay Routing}
+
+Beyond Source Routing, there are no mechanisms to experiment with how routers
+work on the Internet. As the IPv6 deployment process has demonstrated, network
+layer protocols are not easy to change.
 
 An alternative to designing and deploying a full new network layer protocol is
 experimenting on overlay networks. Overlay networks are networks constructed on
@@ -485,18 +528,13 @@ database.
 The design goal of \ac{ron} is to improve reliability by using overlays. The
 result also showed that latency and throughput could be improved via overlays.
 However, as an application-level approach, \ac{ron} cannot be applied to
-unmodified applications. Additionally, while routing tables update quickly in
-response to network outages, they otherwise change slowly and give a single,
-alternative overlay path. It is not possible for applications to use multiple
-overlay paths simultaneously.
-
-In \cite{andersen2003best}, Andersen \textit{et al.} later described a redundant
-routing scheme in which redundant copies of packets are sent along multiple
-paths. They compared this approach with a more traditional approach that reacts
-to link failures and routes around them, similar to the \ac{ron} framework's
-original routing system. However, they did not attempt to use multiple paths
-without redundancy, since their study focused on loss rates rather than
-throughput.
+unmodified applications. In \cite{andersen2003best}, Andersen \textit{et al.}
+later described a redundant routing scheme in which redundant copies of packets
+are sent along multiple paths. They compared this approach with a more
+traditional approach that reacts to link failures and routes around them,
+similar to the \ac{ron} framework's original routing system. However, they did
+not attempt to use multiple paths without redundancy, since their study focused
+on loss rates rather than throughput.
 
 Gummadi \textit{et al.} \cite{gummadi2004improving} demonstrated a simpler
 approach to detour routing. Rather than creating a full overlay network where
@@ -506,14 +544,22 @@ intermediary, which then forwards the traffic on to the destination. The
 intermediary performs \ac{nat}, so that reply traffic is forwarded back to the
 destination. Using \ac{sosr} and randomly selected PlanetLab intermediaries,
 they were able to recover from 56\% of failures on the paths to popular web
-servers. However, they did not report the throughput of \ac{sosr} paths.
+servers. However, they did not report the throughput of \ac{sosr} paths. In this
+thesis, we use an approach very similar to Gummadi \textit{et al.} in simply
+tunneling traffic across a chosen intermediary, rather than constructing a
+complete overlay network.
 
 As far as we could find, there are no overlay routing systems which attempt to
 correct Internet routing inefficiencies by combining multiple paths without
-redundancy. Our system uses \ac{mptcp} to achieve this. It also uses the
-simplified one-hop source routing strategy of Gummadi \textit{et al.}
-\cite{gummadi2004improving} rather than designing an overlay network with a new
-routing system.
+redundancy. However, transport-layer systems based on overlay networks have been
+created which do so (see Section~\ref{s:rw-transport}).
+
+\subsection{Multipath Routing}
+
+
+
+\section{Transport Layer}
+\label{s:rw-transport}
 
 
 \chapter{Implementation}
