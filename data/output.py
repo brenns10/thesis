@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 """Parse JSON output of experiments."""
 
+import itertools
 import json
 
 import numpy as np
@@ -32,6 +33,23 @@ def objects_to_bps(obj_list):
             yield bps
 
 
+def objects_to_utilization(obj_list):
+    """Converts a sequence of JSON objects to their CPU utulization average."""
+    for obj in obj_list:
+        # remote_total tends to be a percent or two higher, report it to be
+        # conservative
+        u = obj.get('end', {}).get('cpu_utilization_percent', {}).get('remote_total')
+        if u:
+            yield u
+
+
+def show_max_utilization(filenames):
+    """Report the max CPU utilization of all the JSON files."""
+    all_utilization = map(objects_to_utilization, map(json_parse, filenames))
+    chained = itertools.chain.from_iterable(all_utilization)
+    print(max(chained))
+
+
 def get_numpy_array(filename):
     return np.array(list(objects_to_bps(json_parse(filename))))
 
@@ -54,8 +72,16 @@ def plot_comparison(name):
     fig, ax = plt.subplots()
     data = [mptcp_ctrl, mptcp_nat, mptcp_vpn, vanilla_ctrl, vanilla_nat,
             vanilla_vpn]
-    labels = ['1 Subflow', 'NAT', 'VPN', 'TCP', 'TCP(NAT)', 'TCP(VPN)']
+    labels = ['1 Sub flow', 'NAT', 'VPN', 'TCP', 'TCP(NAT)', 'TCP(VPN)']
     print(list(map(len, data)))
     ax.boxplot(data, labels=labels)
     ax.set_ylabel('Throughput (Mbps)')
     ax.set_title('Throughput Comparison (%s)' % name)
+
+
+if __name__ == '__main__':
+    import sys
+    if sys.argv[1] == 'cpu':
+        print('Computing max CPU utilization.')
+        filenames = sys.argv[2:]
+        show_max_utilization(filenames)
