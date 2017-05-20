@@ -1,7 +1,48 @@
+Code and implementation citations:
+
 @misc{mptcp,
   title = {Multipath {TCP} in the {Linux Kernel}},
   author = {Paasch, Christoph and Barr\'{e}, S\'{e}bastien and others},
   url = "http://www.multipath-tcp.org"
+}
+
+@misc{mininet,
+  title={Mininet: An instant virtual network on your laptop (or other PC)},
+  author={Team, Mininet},
+  year={2012}
+}
+
+
+RFC Citations. I try to generate the BibTeX from IETF Datatracker.
+
+@misc{rfc791,
+	series =	{Request for Comments},
+	number =	791,
+	howpublished =	{RFC 791},
+	publisher =	{RFC Editor},
+	doi =		{10.17487/rfc791},
+	url =		{https://rfc-editor.org/rfc/rfc791.txt},
+	author =	{Postel, Jon and others},
+	title =		{{Internet Protocol}},
+	pagetotal =	51,
+	year =		1981,
+	month =		sep,
+	abstract =	{},
+}
+
+@misc{rfc6182,
+	series =	{Request for Comments},
+	number =	6182,
+	howpublished =	{RFC 6182},
+	publisher =	{RFC Editor},
+	doi =		{10.17487/rfc6182},
+	url =		{https://rfc-editor.org/rfc/rfc6182.txt},
+	author =	{Janardhan Iyengar and Costin Raiciu and Sebastien Barre and Mark J. Handley and Alan Ford},
+	title =		{{Architectural Guidelines for Multipath TCP Development}},
+	pagetotal =	28,
+	year =		2011,
+	month =		mar,
+	abstract =	{Hosts are often connected by multiple paths, but TCP restricts communications to a single path per transport connection. Resource usage within the network would be more efficient were these multiple paths able to be used concurrently. This should enhance user experience through improved resilience to network failure and higher throughput.},
 }
 
 @misc{rfc6824,
@@ -19,6 +60,84 @@
 	abstract =	{TCP/IP communication is currently restricted to a single path per connection, yet multiple paths often exist between peers. The simultaneous use of these multiple paths for a TCP/IP session would improve resource usage within the network and, thus, improve user experience through higher throughput and improved resilience to network failure.},
 }
 
+@misc{rfc6897,
+	series =	{Request for Comments},
+	number =	6897,
+	howpublished =	{RFC 6897},
+	publisher =	{RFC Editor},
+	doi =		{10.17487/rfc6897},
+	url =		{https://rfc-editor.org/rfc/rfc6897.txt},
+	author =	{Alan Ford and Michael Scharf},
+	title =		{{Multipath TCP (MPTCP) Application Interface Considerations}},
+	pagetotal =	31,
+	year =		2013,
+	month =		mar,
+	abstract =	{Multipath TCP (MPTCP) adds the capability of using multiple paths to a regular TCP session. Even though it is designed to be totally backward compatible to applications, the data transport differs compared to regular TCP, and there are several additional degrees of freedom that applications may wish to exploit. This document summarizes the impact that MPTCP may have on applications, such as changes in performance. Furthermore, it discusses compatibility issues of MPTCP in combination with non-MPTCP-aware applications. Finally, the document describes a basic application interface that is a simple extension of TCP&#39;s interface for MPTCP-aware applications.},
+}
+
+@misc{rfc6356,
+	series =	{Request for Comments},
+	number =	6356,
+	howpublished =	{RFC 6356},
+	publisher =	{RFC Editor},
+	doi =		{10.17487/rfc6356},
+	url =		{https://rfc-editor.org/rfc/rfc6356.txt},
+	author =	{Costin Raiciu and Mark J. Handley and Damon Wischik},
+	title =		{{Coupled Congestion Control for Multipath Transport Protocols}},
+	pagetotal =	12,
+	year =		2011,
+	month =		oct,
+	abstract =	{Often endpoints are connected by multiple paths, but communications are usually restricted to a single path per connection. Resource usage within the network would be more efficient were it possible for these multiple paths to be used concurrently. Multipath TCP is a proposal to achieve multipath transport in TCP.},
+}
+
+@techreport{draft-olia,
+	number =	{draft-khalili-mptcp-congestion-control-05},
+	type =		{Internet-Draft},
+	institution =	{Internet Engineering Task Force},
+	publisher =	{Internet Engineering Task Force},
+	note =		{Work in Progress},
+	url =		{https://datatracker.ietf.org/doc/html/draft-khalili-mptcp-congestion-control-05},
+	author =	{Ramin Khalili and Nicolas Gast and Miroslav Popovic and Jean-Yves Le Boudec},
+	title =		{{Opportunistic Linked-Increases Congestion Control Algorithm for MPTCP}},
+	pagetotal =	11,
+	year =		2014,
+	month =		jul,
+	day =		4,
+	abstract =	{This document describes the mechanism of OLIA, the &quot;Opportunistic Linked Increases Algorithm&quot;. OLIA is a congestion control algorithm for MPTCP. The current congestion control algorithm of MPTCP, LIA [4], forces a tradeoff between optimal congestion balancing and responsiveness. OLIA&#39;s design departs from this tradeoff and provide these properties simultaneously. Hence, it solves the identified performance problems with LIA while retaining non-flappiness and responsiveness behavior of LIA, as shown by different studies [5, 6, 7, 8]. OLIA is now part of the UCLouvain&#39;s MPTCP implementation [9, 11].},
+}
+
+@techreport{draft-balia,
+	number =	{draft-walid-mptcp-congestion-control-04},
+	type =		{Internet-Draft},
+	institution =	{Internet Engineering Task Force},
+	publisher =	{Internet Engineering Task Force},
+	note =		{Work in Progress},
+	url =		{https://datatracker.ietf.org/doc/html/draft-walid-mptcp-congestion-control-04},
+	author =	{Anwar Walid and Qiuyu Peng and Steven H. Low and Jaehyun Hwang},
+	title =		{{Balanced Linked Adaptation Congestion Control Algorithm for MPTCP}},
+	pagetotal =	11,
+	year =		2016,
+	month =		jan,
+	day =		25,
+	abstract =	{This document describes the mechanism of Balia, the &quot;Balanced linked adaptation&quot;, which is a congestion control algorithm for Multipath TCP (MPTCP). The recent proposals, LIA and OLIA, suffer from either unfriendliness to Single Path TCP (SPTCP) or unresponsiveness to network changes under certain conditions. The tradeoff between friendliness and responsiveness is inevitable, but Balia judiciously balances this tradeoff based on a new design framework that allows one to systematically explore the design space. Balia has been implemented in the Linux kernel and also included in the UCLouvain&#39;s MPTCP implementation.},
+}
+
+@techreport{draft-wvegas,
+	number =	{draft-xu-mptcp-congestion-control-05},
+	type =		{Internet-Draft},
+	institution =	{Internet Engineering Task Force},
+	publisher =	{Internet Engineering Task Force},
+	note =		{Work in Progress},
+	url =		{https://datatracker.ietf.org/doc/html/draft-xu-mptcp-congestion-control-05},
+	author =	{Mingwei Xu and Enhuan Dong and Yu Cao},
+	title =		{{Delay-based Congestion Control for MPTCP}},
+	pagetotal =	12,
+	year =		2017,
+	month =		jan,
+	day =		1,
+	abstract =	{This document describes the mechanism of wVegas (weighted Vegas), which is a delay-based congestion control for MPTCP. The current congestion control algorithm of MPTCP, LIA, achieves only course- grained load balancing, since it is based on packet loss event. On the contrary, wVegas adopts packet queuing delay as congestion signals, thus achieving fine-grained load balancing. Compared with loss-based algorithms, wVegas is more sensitive to the changes of network congestion and thus achieves more timely traffic shifting and quicker convergence. WVegas has been implemented in the Linux Kernel and is part of the UCLouvain&#39;s MPTCP implementation now.},
+}
+
 @techreport{boucadair-mptcp-plain-mode-10,
 	number =	{draft-boucadair-mptcp-plain-mode-10},
 	type =		{Internet-Draft},
@@ -34,6 +153,9 @@
 	day =		9,
 	abstract =	{Because of the lack of Multipath TCP (MPTCP) support at the server side, some service providers now consider a network-assisted model that relies upon the activation of a dedicated function called MPTCP Conversion Point (MCP). Network-Assisted MPTCP deployment models are designed to facilitate the adoption of MPTCP for the establishment of multi-path communications without making any assumption about the support of MPTCP by the communicating peers. MCPs located in the network are responsible for establishing multi-path communications on behalf of endpoints, thereby taking advantage of MPTCP capabilities to achieve different goals that include (but are not limited to) optimization of resource usage (e.g., bandwidth aggregation), of resiliency (e.g., primary/backup communication paths), and traffic offload management. This document specifies extensions for Network-Assisted MPTCP deployment models.},
 }
+
+
+Paper Citations:
 
 @inproceedings{radio-agg,
   title={Transparent Bandwidth Aggregation for Residential Access Networks},
@@ -169,13 +291,6 @@
   publisher={IEEE}
 }
 
-@article{rfc791,
-  title={RFC 791: Internet protocol},
-  author={Postel, Jon and others},
-  year={1981},
-  publisher={September}
-}
-
 @inproceedings{gummadi2004improving,
   title={Improving the Reliability of Internet Paths with One-hop Source Routing.},
   author={Gummadi, P Krishna and Madhyastha, Harsha V and Gribble, Steven D and Levy, Henry M and Wetherall, David and others},
@@ -183,12 +298,6 @@
   volume={4},
   pages={13--13},
   year={2004}
-}
-
-@misc{mininet,
-  title={Mininet: An instant virtual network on your laptop (or other PC)},
-  author={Team, Mininet},
-  year={2012}
 }
 
 @inproceedings{lantz2010network,
@@ -226,4 +335,24 @@
   booktitle={USENIX Annual Technical Conference, General Track},
   pages={99--112},
   year={2004}
+}
+
+@article{iyengar2006concurrent,
+  title={Concurrent multipath transfer using SCTP multihoming over independent end-to-end paths},
+  author={Iyengar, Janardhan R and Amer, Paul D and Stewart, Randall},
+  journal={IEEE/ACM Transactions on networking},
+  volume={14},
+  number={5},
+  pages={951--964},
+  year={2006},
+  publisher={IEEE}
+}
+
+@article{barre2011multipath,
+  title={Multipath TCP: from theory to practice},
+  author={Barr{\'e}, S{\'e}bastien and Paasch, Christoph and Bonaventure, Olivier},
+  journal={NETWORKING 2011},
+  pages={444--457},
+  year={2011},
+  publisher={Springer}
 }
