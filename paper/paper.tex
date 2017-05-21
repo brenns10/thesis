@@ -1095,6 +1095,31 @@ multicast group, and begins waiting for requests. For each request, it sends a
 UDP request to every NAT detour. When the receiving thread receives a response,
 it sends the final data over the Netlink socket back to the path manager.
 
+\section{Security Considerations}
+
+Using this mechanism, a malicious third-party detour could be given access to
+read and modify the partial contents of an \ac{mptcp} connection. We believe
+that this risk is mitigated by the following factors:
+
+\begin{itemize}
+\item Usage of TLS, especially in the web, is becoming ubiquitous. Due to the
+  design of our \ac{mptcp} and our system, the initial three-way handshake of
+  TCP is completed before any subflows can begin initialization. TLS handshake
+  information will thus be exchanged on the first subflow, before or
+  concurrently with the establishment of additional subflows. As a result,
+  connections can be protected by TLS by the time additional subflows are
+  transmitting data. TLS encrypts data, protecting the privacy of the
+  transmission, and detects modifications, preventing modification of data by a
+  malicious detour.
+\item Modifications of data that result in changing the \ac{dss} mapping size
+  are likely to be detected and treated as a \ac{mptcp} protocol error.
+\item A large-scale implementation of this mechanism could involve mutual
+  authentication of the client and detour, via PKI. So long as a third party can
+  be trusted to verify that a detour is malicious, and the third party can be
+  trusted, a scheme like this can prevent malicious third-parties from being
+  used as detours.
+\end{itemize}
+
 \chapter{Evaluation}
 \label{c:eval}
 
