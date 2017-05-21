@@ -825,13 +825,24 @@ forwards these to the final destination, and forwards reply packets to the
 client. In order to do this, clients use a simple signaling protocol to request
 tunnels from a detour.
 
-The Linux kernel's Netfilter framework allows for two types of NAT
-\cite{russell2002nat}. The first kind, source NAT (SNAT), rewrites the source
-address of the packet. This is the typical form of NAT used by home routers: the
-source address of an outgoing connection is rewritten to be the router's
-external IP address, but the destination is unchanged. The second kind of NAT
-supported by Netfilter is destination NAT, or DNAT. This rewrites the
-destination address of the packet.
+\begin{figure}
+  \centering
+  \includegraphics[height=0.3\textheight]{figures/NATTypes.pdf}
+  \caption[Types of NAT provided by Netfilter]{Types of NAT provided by
+    Netfilter. \textbf{Top:} SNAT only. \textbf{Middle:} DNAT only.
+    \textbf{Bottom:} Both SNAT and DNAT, as used in the NAT tunnel.}
+  \label{fig:NATTypes}
+\end{figure}
+
+The Linux kernel's Netfilter framework allows for two types of NAT, illustrated
+in Figure~\ref{fig:NATTypes} \cite{russell2002nat}. The first kind, source NAT
+(SNAT), rewrites the source address of the packet. This is the typical form of
+NAT used by home routers: the source address of an outgoing connection is
+rewritten to be the router's external IP address, but the destination is
+unchanged. This type of rule is applied after routing has taken place. The
+second kind of NAT supported by Netfilter is destination NAT (or DNAT) which
+rewrites the destination of the packet. This rule is applied before routing, so
+that a proper interface can be selected for the new address.
 
 The detour takes advantage of both forms of NAT offered by the kernel. First, it
 applies DNAT, setting the destination address to be the final server's IP
@@ -873,10 +884,10 @@ The \texttt{ver} field is a protocol version, currently set to 1. The
 \texttt{op} field contains the operation of this message: request (0) or
 response (1). The \texttt{reserved} field is unused, providing padding for the
 request. In the future, this field could be used for flags that enable IPv6
-support. The fields \texttt{rip} (short for ``remote IP'') and \texttt{rpt}
-correspond to the address and TCP port of the server the client wishes to create
-a detour to. To understand the \texttt{dpt} field, it is useful to look at all
-of the addresses and ports in use during a tunneled connection:
+support. Since there are several IP addresses and ports involved in the
+tunneling setup, we will define them each before defining the remaining fields
+of the message.
+
 \begin{itemize}
 \item Client IP, port: the IP address of the client, and the client-side port,
   which is usually ephemeral.
@@ -888,18 +899,21 @@ of the addresses and ports in use during a tunneled connection:
   connection to.
 \end{itemize}
 
-The \texttt{dpt} field corresponds to the detour port, client side. In a
-request, the client proposes a port. In the response, the detour specifies the
-actual port which will be used. The server may wish to alter the \texttt{dpt}
-field for several reasons:
+The fields \texttt{rip} (short for ``remote IP'') and \texttt{rpt} correspond to
+remote IP and port. The \texttt{dpt} field corresponds to the detour port,
+client side. In a request, the client proposes a \texttt{dpt} (usually the same
+as the \texttt{rpt}). In the response, the detour specifies the actual port
+which should actually be. The detour may wish to alter the \texttt{dpt} field
+for several reasons:
+
 \begin{itemize}
-\item A tunnel to the remote IP, port pair is already open on a different detour
-  port.
-\item The client already has a detour open (to a different remote) on the given
-  port.
+\item A tunnel to the remote IP, port pair is already open. The detour may wish
+  to return the \texttt{dpt} already associated.
+\item The client is already using the given \texttt{dpt} to connect to a
+  different remote IP and/or port.
 \item The detour may have a socket listening for connections on the proposed
-  port, and so it may wish to avoid creating a tunnel which would prevent the
-  client from accessing that service.
+  port (such as an HTTP server on port 80), and so it may wish to avoid creating
+  a tunnel which would prevent the client from accessing that service.
 \end{itemize}
 
 In order to create the tunnels, the detour runs two IPTables commands, which
