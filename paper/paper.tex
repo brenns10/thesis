@@ -699,19 +699,20 @@ new overlay routes to a Multipath TCP connection. Each overlay route is a new
 subflow, which is tunneled across a third-party host. The system involves at
 least three hosts:
 \begin{itemize}
-\item The \emph{client} is the host which adds detour routes, attempting to
-  improve its connection quality. The client must be the host which initiates
-  the \ac{mptcp} connection.
-\item The \emph{server} is the host with which the client wishes to communicate.
+\item The \emph{client} is the active opener of the \ac{mptcp} connection. In
+  our system, the client actively requests all detours and initiates all
+  subflows.
+\item The \emph{server} is the passive opener of the \ac{mptcp} connection.
 \item The \emph{detour} is a host which acts as a waypoint along the overlay
-  route from the client to the server. It tunnels the \ac{mptcp} connection
-  between them. There may be more than one detour at a time.
+  route from the client to the server. There may be more than one detour at a
+  time, and there are multiple ways to implement the detour service.
 \end{itemize}
 
-We assume only that the server supports Multipath TCP, and require no additional
+We assume that the server supports Multipath TCP, and require no additional
 customization for our system to work. In our current implementation, the detour
-host must run some version of Linux, and the client must run a custom version of
-Linux.
+host must run some version of Linux, and the client must run a version of the
+Linux kernel that is built with support for \ac{mptcp} and our path manager
+patch.
 
 The system is implemented via a number of interacting components. First, a path
 manager extension for version 0.91 of the Linux \ac{mptcp} implementation
@@ -723,7 +724,7 @@ detour host. These components are illustrated in Figure~\ref{f:MovingParts}.
 
 \begin{figure}[h]
   \centering
-  \includegraphics[width=\textwidth]{figures/MovingParts.pdf}
+  \includegraphics[width=0.8\textwidth]{figures/MovingParts.pdf}
   \caption[Interaction of client, detour, and server]{
     The components and their communications. In \textbf{A}, the path manager
     requests an overlay route. In \textbf{B}, the client daemon reports overlay
@@ -734,15 +735,18 @@ detour host. These components are illustrated in Figure~\ref{f:MovingParts}.
   \label{f:MovingParts}
 \end{figure}
 
-The typical interaction of these components is as follows. First, the client
-creates a \ac{mptcp} connection to the server. The first subflow uses the Internet
-routed path. Once this connection is fully established, the path manager
-requests overlay routes on which it may create subflows. The client and detour
-daemons negotiate a tunnel, which may be implemented in two different ways. The
-client reports this to the path-managers, which creates subflows for the \ac{mptcp}
-connection across every available detour, until a predefined limit is reached.
+The typical interaction of these components is as follows. First, a process on
+the client creates a \ac{mptcp} connection to the server. The first subflow uses
+the Internet routed path. Once this connection is fully established, the path
+manager requests overlay routes on which it may create subflows. The client
+detour daemon receives this request, and attempts to set up detours based on a
+static configuration file. The client and detour daemons negotiate a tunnel,
+which may be implemented in two different ways. The client reports this back to
+the kernel, which creates subflows for the \ac{mptcp} connection across every
+available detour, until a predefined limit is reached. In our implementation,
+this limit is two, but it may be modified by a sysctl.
 
-In the remainder of this section, we will discuss each of these components at
+In the remainder of this chapter, we will discuss each of these components at
 length.
 
 \section{Detour Daemon}
@@ -753,19 +757,20 @@ tunneling traffic from the client to the server.
 
 \subsection{OpenVPN Tunneling}
 
-The first mechanism involves the open-source tool OpenVPN. Detours run a
-specially configured OpenVPN server. Clients connect to this VPN, creating a
-virtual network device. The client receives a routing rule from the detour
-advertising that it can reach all hosts on the Internet with a very high cost.
-As a result, the client operating system will prefer other routes instead of the
-VPN.
+The first mechanism involves the open-source tool OpenVPN
+\cite{yonan2007openvpn}. Detours run a specially configured OpenVPN server.
+Clients connect to this VPN, creating a virtual network device. The client
+receives a routing rule from the detour advertising that it can reach all hosts
+on the Internet with a very high cost. As a result, the client operating system
+will prefer other routes instead of the VPN. However, the route is available for
+the path manager to route subflows along.
 
 The VPN connection is configured as follows:
 
 \begin{itemize}
 \item The connection is over UDP, to avoid the so-called ``TCP Meltdown'' effect
-  caused by two congestion control algorithms interfering with each other.
-  % TODO citation
+  caused by two sets of TCP timers and congestion control algorithms interfering
+  with each other \cite{khanvilkar2004virtual}.
 \item The initial connection negotiation requires the client and server to
   exchange certificates.
 \item Subsequent messages are not protected by encryption or signatures, to
@@ -773,12 +778,12 @@ The VPN connection is configured as follows:
 \end{itemize}
 
 One important aspect of VPN configuration is that the detour must create a
-private IP subnet. It will provide a DHCP service in order to assign IP
-addresses to clients as they connect to the VPN. Clients are expected to be able
-to connect to multiple detours simultaneously. In order to do this without
-conflict, each detour must use a distinct private IP subnet, so that there is no
-chance of the client addresses overlapping, and also so that the gateway address
-of the VPN is unique on the client.
+private IP subnet. It provides a DHCP service in order to assign IP addresses to
+clients as they connect to the VPN. Clients are expected to be able to connect
+to multiple detours simultaneously. In order to do this without conflict, each
+detour must use a distinct private IP subnet, so that there is no chance of the
+client addresses overlapping, and also so that the gateway address of the VPN is
+unique on the client.
 
 In a large-scale implementation of this technology, these subnet allocations
 could be handled by a centralized detour management server. The 10.0.0.0/8
@@ -789,11 +794,10 @@ However, in our testing, subnets were manually allocated to avoid conflicts.
 Finally, in order to forward VPN traffic to the internet, the detour must be
 configured (via Netfilter) to perform network address translation (NAT) on
 outgoing packets. This process is typical for a home router and for VPNs which
-provide Internet access. Multipath TCP is designed with this behavior in mind,
-and so it is capable of functioning through NAT, so long as the middleboxes do
-not remove TCP options in transit.
-
-% TODO cite MPTCP design/architecture for middleboxes
+provide Internet access. As discussed earlier, \ac{mptcp} is designed with this
+behavior in mind, and so it is capable of functioning through NAT, so long as
+the middleboxes do not remove TCP options in transit, or modify data contents
+\cite{rfc6182}.
 
 The OpenVPN implementation has several attractive qualities. First, it relies on
 a well-used protocol for forwarding traffic. Second, it need not be configured
@@ -806,40 +810,41 @@ required.
 
 \subsection{NAT Tunneling}
 
-The second approach directly modifies packets, without actually using a protocol
-(like OpenVPN) for tunneling. Since we only need to forward some connections to
-some destinations, the full power of OpenVPN is not necessary. Instead, packets
-are addressed directly to the detour. The detour can forward these to the
-final destination, and forward reply packets to the client. In order to do this,
-the detour must have advance knowledge of the final destination of the packet.
-So, clients use a simple signaling protocol to request tunnels via a detour.
+The second approach directly modifies packet source and destination addresses,
+without actually using a protocol (like OpenVPN) for tunneling. Rather than
+establish a generic tunnel with the detour, we instead inform the detour of our
+intended destination, and request that it perform \ac{nat} on our packets. Then,
+we address packets directly to the detour, on an agreed upon port. The detour
+forwards these to the final destination, and forwards reply packets to the
+client. In order to do this, clients use a simple signaling protocol to request
+tunnels from a detour.
 
-The Linux kernel's Netfilter framework allows for two types of NAT. The first
-kind, source NAT (SNAT), rewrites the source address of the packet. This is
-the typical form of NAT used by home routers: the source address of an outgoing
-connection is rewritten to be the router's external IP address, but the
-destination is unchanged. The second kind of NAT supported by Netfilter is
-destination NAT, or DNAT. This rewrites the destination address of the packet.
-
-% TODO - netfilter docs citation
+The Linux kernel's Netfilter framework allows for two types of NAT
+\cite{russell2002nat}. The first kind, source NAT (SNAT), rewrites the source
+address of the packet. This is the typical form of NAT used by home routers: the
+source address of an outgoing connection is rewritten to be the router's
+external IP address, but the destination is unchanged. The second kind of NAT
+supported by Netfilter is destination NAT, or DNAT. This rewrites the
+destination address of the packet.
 
 The detour takes advantage of both forms of NAT offered by the kernel. First, it
 applies DNAT, setting the destination address to be the final server's IP
-address (arranged ahead of time). Then, it applies SNAT, setting the source
+address (signaled ahead of time). Then, it applies SNAT, setting the source
 address to be its own external IP. The Netfilter framework remembers these
 connections so that reply packets are properly forwarded back to the client.
 
 Thanks to Netfilter, this NAT mapping can be arranged with two \texttt{iptables}
 commands, with no custom kernel or user-space code required for packet
-forwarding. It is possible to implement this in userspace using raw sockets, but
-this approach has several drawbacks. It would have to be single-threaded, and it
-would require that packet data be copied from kernel space into user space and
-back. More critically, the connection tracking provided by the kernel is more
-robust than what would be implemented by user space.
+forwarding. It is possible to implement this in userspace using Netfilter-Queue
+and a user-space application, but this approach has several drawbacks. It would
+have to be single-threaded, and it would require that packet data be copied from
+kernel space into user space and back. More critically, the connection tracking
+provided by the kernel is more robust than what would be implemented by user
+space.
 
 As mentioned earlier, the server address must be communicated to the detour
 ahead of time in order to use this scheme. To that end, we have designed a
-simple UDP-based for clients to ``request'' NAT mappings from a detour. The
+simple UDP-based protocol for clients to request NAT mappings from a detour. The
 detour listens for requests on UDP port 45672. The request format is shown
 in Figure~\ref{fig:udp-nat-packet}.
 
@@ -860,12 +865,12 @@ in Figure~\ref{fig:udp-nat-packet}.
 
 The \texttt{ver} field is a protocol version, currently set to 1. The
 \texttt{op} field contains the operation of this message: request (0) or
-response (1). The \texttt{reserved} field is unused, currently existing to pad
-the request. The field \texttt{rip} (short for ``remote IP'') is the address
-that the client wishes to create a detour to. \texttt{rpt} is the TCP port on
-the server to create a detour to. To understand the \texttt{dpt} field, it is
-useful to describe all of the addresses and ports in use during a tunneled
-connection:
+response (1). The \texttt{reserved} field is unused, providing padding for the
+request. In the future, this field could be used for flags that enable IPv6
+support. The fields \texttt{rip} (short for ``remote IP'') and \texttt{rpt}
+correspond to the address and TCP port of the server the client wishes to create
+a detour to. To understand the \texttt{dpt} field, it is useful to look at all
+of the addresses and ports in use during a tunneled connection:
 \begin{itemize}
 \item Client IP, port: the IP address of the client, and the client-side port,
   which is usually ephemeral.
@@ -886,9 +891,9 @@ field for several reasons:
   port.
 \item The client already has a detour open (to a different remote) on the given
   port.
-\item The detour may have a socket accepting connection on the proposed port,
-  and so it may wish to avoid creating a tunnel which would prevent the client
-  from accessing that service.
+\item The detour may have a socket listening for connections on the proposed
+  port, and so it may wish to avoid creating a tunnel which would prevent the
+  client from accessing that service.
 \end{itemize}
 
 In order to create the tunnels, the detour runs two IPTables commands, which
@@ -929,24 +934,25 @@ rules are applied in reverse to response packets.
 
 The detour daemon is implemented as a Python script. It listens for tunnel
 requests, executes the correct commands to create them, and then sends
-responses. It ensures that detour ports do not collide with each other, or with
+responses. It ensures that detour ports do not conflict with each other, or with
 ports that are open on the daemon machine. It also ensures that on termination,
 all tunnels are torn down.
 
-This mechanism has the advantage that it requires zero overhead. Since no
-headers are added, the full amount of data may be transmitted on these segments.
-However, its disadvantage is that tunnels must be configured each time a new
-connection is created on the client. While the client may simply send packets to
-a new remote through an OpenVPN tunnel, it must incur a RTT delay requesting a
-new tunnel from the NAT detour before it can begin establishing a subflow.
+This mechanism has the advantage that it requires zero space overhead within the
+packet. Since no headers are added, the full amount of data may be transmitted
+on these segments. However, its disadvantage is that tunnels must be configured
+each time a new connection is created on the client. In the case of OpenVPN, a
+new subflow may routed through an existing OpenVPN connection without any
+additional communication with the detour. However, with the NAT approach, each
+time a subflow is initiated with a new server, a tunnel must first be negotiated
+with the detour server.
 
 \section{Path Manager}
 
-To enable subflows to use the detours created above, we implement a custom \ac{mptcp}
-path manager within the Linux kernel. The path manager is a module which
-dictates local policy for creating new subflows and announcing local addresses.
-For example, the \texttt{fullmesh} path manager creates a subflow between each
-address on the client and server.
+To enable subflows to use the detours created above, we implement a custom
+\ac{mptcp} path manager within the Linux kernel. As previously described, the
+path manager is a module which dictates local policy for creating new subflows
+and announcing local addresses.
 
 The path manager receives space within the \ac{mptcp} control buffer in order to
 track state, and it registers a set of callbacks with the protocol, so that it
