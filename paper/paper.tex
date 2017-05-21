@@ -758,24 +758,30 @@ tunneling traffic from the client to the server.
 \subsection{OpenVPN Tunneling}
 
 The first mechanism involves the open-source tool OpenVPN
-\cite{yonan2007openvpn}. Detours run a specially configured OpenVPN server.
-Clients connect to this VPN, creating a virtual network device. The client
-receives a routing rule from the detour advertising that it can reach all hosts
-on the Internet with a very high cost. As a result, the client operating system
-will prefer other routes instead of the VPN. However, the route is available for
-the path manager to route subflows along.
-
-The VPN connection is configured as follows:
+\cite{yonan2007openvpn}. OpenVPN is a program which provides virtual networking
+between two computers. It comes with two operating modes. The first provides a
+simple virtual link between two hosts, with no other capabilities. The second
+uses this virtual link to create a virtual network. One host is the server,
+which provides IP addresses and routes traffic among clients and the rest of the
+Internet. OpenVPN also provides encryption and PKI-based authentication
+services. Our detour runs OpenVPN as a server in the second mode of operation,
+configured as follows:
 
 \begin{itemize}
 \item The connection is over UDP, to avoid the so-called ``TCP Meltdown'' effect
   caused by two sets of TCP timers and congestion control algorithms interfering
-  with each other \cite{khanvilkar2004virtual}.
+  with each other when TCP is tunneled through TCP \cite{khanvilkar2004virtual}.
 \item The initial connection negotiation requires the client and server to
   exchange certificates.
 \item Subsequent messages are not protected by encryption or signatures, to
   reduce per-packet space and time overhead.
 \end{itemize}
+
+Clients connect to this VPN, creating a virtual network device. The
+client receives a routing rule from the detour advertising that it can reach all
+hosts on the Internet with a very high cost. As a result, the client operating
+system will prefer other routes instead of the VPN. However, the route is
+available for the path manager to route subflows along.
 
 One important aspect of VPN configuration is that the detour must create a
 private IP subnet. It provides a DHCP service in order to assign IP addresses to
