@@ -974,18 +974,44 @@ To enable subflows to use the detours created above, we implement a custom
 path manager is a module which dictates local policy for creating new subflows
 and announcing local addresses.
 
+\begin{figure}
+  \centering
+  \includegraphics[width=0.8\textwidth]{figures/KernDataStruct.pdf}
+  \caption{Simplified view of Path Manager data structures}
+  \label{fig:KernDataStruct}
+\end{figure}
+
 The path manager receives space within the \ac{mptcp} control buffer in order to
 track state, and it registers a set of callbacks with the protocol, so that it
-can be notified of events as they occur. Our path manager (named
-\texttt{detour}) runs a worker when a client-side \ac{mptcp} connection becomes
-fully established (i.e. after the three-way handshake completes). The first
-thing this does is send a message to userspace, requesting a detour. Then, it
+can be notified of events as they occur. Global state, such as the list of
+available detours, must be stored on a per-network namespace basis. This is
+required not only to satisfy the demands of a modern kernel which supports
+namespacing and containerization, but also so that experiments using Mininet,
+which relies on namespaces, run successfully. A simplified view of the data
+structures maintained by the path manager is presented in
+Figure~\ref{fig:KernDataStruct}.
+
+The path manager consists of two main components. First, a background worker
+which selects and adds detours to \ac{mptcp} connections. Second, a
+communication interface so that information and commands can be exchanged with
+user-space components.
+
+\subsection{Subflow Worker}
+
+The subflow worker runs in two situations, in the context of a particular
+\ac{mptcp} socket. First, when a \ac{mptcp} connection becomes fully established
+(i.e. after the three-way handshake completes). Second, when a new detour has
+been made available to this network namespace, and the detour could be used for
+this connection.
+
+On its first run, the subflow worker uses the Generic Netlink communication
+interface (described in Section~\ref{s:genl}), requesting a detour. Then, it
 looks through an internal list of detours. The kernel maintains two lists of
 detours (per network namespace). The first is a list of OpenVPN detours. These
 detour entries are not specific to a server, and they simply indicate the name
 of a network interface to use. The second list contains NAT detours. These
 consist of a detour address and port, and a server address and port. The worker
-may only select NAT entries which match the server address and port of the
+may only select NAT entries which match the destination address and port of the
 connection it is working on.
 
 The task attempts to add up to $N$ subflows, where $N$ is a configurable limit.
@@ -997,38 +1023,20 @@ the NAT detours, because they are available immediately. NAT detours created by
 the client daemon become available only once the daemon has processed the
 request from the kernel.
 
-The kernel listens for new detour routes. When it receives them, it adds them to
-the appropriate internal list. Then, it iterates over every \ac{mptcp} connection
-within the network namespace of the message, waking their workers to give them
-the opportunity to create a new subflow along this detour. If the detour was
-OpenVPN type, every worker notified. If the detour was NAT type, then only
-connections which match the server address and port are notified.
+\subsection{Generic Netlink}
+\label{s:genl}
 
-\section{Client Daemon}
-
-The client daemon has several responsibilities. First, it must create OpenVPN
-connections and report them to the kernel. Second, it must respond to detour
-requests from the kernel by creating NAT detours and reporting them back.
-
-The daemon has a configuration file which allows the user to specify the IP
-addresses of hosts to use for both types of detours. On startup, the daemon
-connects to each OpenVPN detour and reports the resulting network interfaces to
-the kernel. Then, it waits listening for detour requests from the kernel. For
-each request, it requests a detour from every NAT detour address. Upon receiving
-responses, it sends them the the kernel as well.
-
-\subsection{Client Communication}
-
-In order to communicate between kernel and userspace, we use Generic Netlink
-sockets. Netlink is an address family for the socket interface
-(\texttt{AF\_NETLINK}, similar to \texttt{AF\_INET}), which allows communication
-between kernel and userspace. Many existing Linux network configuration
-utilities communicate with the kernel over the Netlink address family, such as
-route and firewall configuration. Each of the subsystems being configured has a
-corresponding protocol family, such as \texttt{NETLINK\_NETFILTER} for Netfilter
-firewall configuration. These protocol families take the same place in the
-\texttt{socket()} system call as protocol families such as \texttt{IPPROTO\_TCP}
-in the \texttt{AF\_INET} and \texttt{AF\_INET6} address families.
+In order to request and receive detour entries from userspace, the path manager
+relies on a communication interface based on Generic Netlink. Netlink is an
+address family for the socket interface (\texttt{AF\_NETLINK}, similar to
+\texttt{AF\_INET}), which allows communication between kernel and userspace.
+Many existing Linux network configuration utilities communicate with the kernel
+over the Netlink address family, such as route and firewall configuration. Each
+of the subsystems being configured has a corresponding protocol family, such as
+\texttt{NETLINK\_NETFILTER} for Netfilter firewall configuration. These protocol
+families take the same place in the \texttt{socket()} system call as protocol
+families such as \texttt{IPPROTO\_TCP} in the \texttt{AF\_INET} and
+\texttt{AF\_INET6} address families.
 
 Creating a new Netlink protocol would involve allocating a new Netlink protocol
 family. To make this process easier, the Generic Netlink protocol family was
@@ -1041,18 +1049,50 @@ particular multicast group. Finally, Generic Netlink comes with a kernel and
 userspace library which allows for a consistent API and a level of abstraction
 when defining Generic Netlink families.
 
-To allow the kernel to request detours, and userspace to communicate the
-existence of these detours, we define a Generic Netlink family. This protocol is
-similar to the UDP protocol which the client daemon uses to request NAT tunnels.
-The kernel sends a message of type \texttt{DETOUR\_C\_REQ} to a ``multicast
-group'' which the client daemon subscribes to. This message contains the
-parameters necessary for the daemon to create a tunnel: the server address and
-port. The client daemon receives this message and creates tunnels, based on a
-configuration file. It then reports these tunnels to the kernel, using a
-\texttt{DETOUR\_C\_ADD} message type. The client daemon may also use the
-\texttt{DETOUR\_C\_DEL} message type to delete a tunnel entry it has previously
-added. Finally, the \texttt{DETOUR\_C\_ECHO} message type requests that the
-kernel log all tunnels for diagnostics.
+We implement a Generic Netlink family, with the following operations
+implemented:
+
+\begin{itemize}
+\item \texttt{DETOUR\_C\_REQ}: An announcement message sent from the kernel to a
+  multicast group, which the client daemon subscribes to. Specifies a remote
+  address and port which the kernel would like to create a detour to.
+\item \texttt{DETOUR\_C\_ADD}: A command sent from userspace to the kernel. Adds
+  a detour (of type NAT or VPN) to the kernel's internal list of detours. When a
+  new, unique detour is received, this command looks through each connection in
+  the current network namespace and wakes its worker, so it may consider using
+  the detour.
+\item \texttt{DETOUR\_C\_DEL}: A command sent from userspace to the kernel.
+  Removes a detour from the kernel's internal list.
+\item \texttt{DETOUR\_C\_ECHO}: A command sent from userspace to the kernel,
+  requesting that the kernel write out its list of detours to the kernel log.
+  This is a useful command for development and debugging.
+\end{itemize}
+
+Generic Netlink provides mechanisms for giving permissions to each operation,
+and allows the kernel to work only within the network namespace of the calling
+program. As a result, the client daemon may only add or remove detours or
+receive requests from its own namespace.
+
+\section{Client Daemon}
+
+The client daemon has two main responsibilities. First, it must create OpenVPN
+connections and report them to the kernel. Second, it must respond to detour
+requests from the kernel by creating NAT detours and reporting them back.
+
+The daemon has a configuration file which allows the user to specify the IP
+addresses of hosts to use for both types of detours. On startup, the daemon
+executes the OpenVPN client software, and waits for it to fully initialize. A
+new thread is used to monitor the OpenVPN client process, logging any important
+messages.
+
+Next the daemon creates a UDP socket corresponding to each NAT detour in its
+configuration file. A separate thread is launched, which calls \texttt{select()}
+on the set of detour sockets, waiting for incoming responses from any detour.
+
+Finally, the detour creates a Netlink socket, subscribes to the path manager's
+multicast group, and begins waiting for requests. For each request, it sends a
+UDP request to every NAT detour. When the receiving thread receives a response,
+it sends the final data over the Netlink socket back to the path manager.
 
 \chapter{Evaluation}
 \label{c:eval}
