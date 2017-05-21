@@ -166,9 +166,9 @@
 \chapter{Introduction}
 
 This thesis proposes a mechanism for exploring and adding alternative paths to a
-TCP connection, for the purpose of improving application throughput. These
-alternative paths travel through ``detour'' hosts, ensuring that the paths are
-distinct from the Internet routed path. The bandwidth of these paths can be
+\ac{mptcp} connection, for the purpose of improving application throughput.
+These alternative paths travel through ``detour'' hosts, ensuring that the paths
+are distinct from the Internet routed path. The bandwidth of these paths can be
 aggregated, allowing better throughput than any of the constituent paths.
 
 \section{Internet Routing Inefficiencies}
@@ -180,17 +180,18 @@ routing table. This table is populated with routes learned from the external
 have considerable freedom to enforce local policy on which routes to advertise,
 and which routes to use. Additionally, the metrics used in route selection
 include hop count and \ac{as} count, which may not correlate well with important
-path characteristics.
+path characteristics such as loss rate or latency.
 
 As a result, the default Internet path between hosts is not always the ``best
-path'' with respect to characteristics such as latency or loss rate. In
-\cite{detour}, Savage \textit{et al.} measured the pairwise latency and packet
-drop rates among a group of hosts. From this dataset, they searched for
-instances where these metrics were better along a ``detour'' route going through
-a third host. They found that half of all pairs of hosts had a ``detour'' route
-with lower latency, and 15\% of the pairs of hosts had a path with at least 25\%
-improvement in latency. For packet loss, 80\% of the pairs had a lower packet
-loss rate, and in nearly half, the packet loss rate improved by a factor of six.
+path'' with respect to these characteristics. In \cite{detour}, Savage
+\textit{et al.} measured the pairwise latency and packet drop rates among a
+group of hosts. From this dataset, they searched for instances where these
+metrics were better along a ``detour'' route going through a third host. They
+found that half of all pairs of hosts had a ``detour'' route with lower latency,
+and 15\% of the pairs of hosts had a path with at least 25\% improvement in
+latency. For packet loss, 80\% of the pairs had a detour path with a lower
+packet loss rate, and in nearly half, the packet loss rate improved by a factor
+of six.
 
 Overlay networks have been proposed as a way to experiment with new routing
 techniques. These techniques create a second network on top of the existing
@@ -219,13 +220,20 @@ makes sense to use both simultaneously, aggregating their available throughput.
 
 \section{Contributions}
 
-This thesis presents a mechanism for using alternative routes that traverse
-third-party ``detour'' hosts. This mechanism is based on \ac{mptcp},
-establishing subflows through each alternative route. Using \ac{mptcp} allows
-multiple routes to be used for a single connection, with data divided across
-each route. Additionally, since \ac{mptcp} presents the same reliable, in-order
-stream API that TCP does, applications using TCP can run unmodified while taking
-advantage of multiple paths.
+\begin{figure}
+  \centering
+  \includegraphics[width=0.8\textwidth]{figures/Concept.pdf}
+  \caption{Conceptual overview of the mechanism}
+  \label{fig:concept}
+\end{figure}
+
+This thesis presents a mechanism for single-homed devices to add alternative
+paths that traverse third-party ``detour'' hosts. This mechanism, illustrated in
+Figure~\ref{fig:concept} is based on \ac{mptcp}, establishing subflows through
+each alternative route. Using \ac{mptcp} allows multiple routes to be used for a
+single connection, with data divided across each route. Additionally, since
+\ac{mptcp} uses the same binary-compatible OS level API as TCP, unmodified
+applications may use this mechanism simply by using our patched kernel.
 
 The contributions of this thesis are as follows:
 \begin{itemize}
@@ -235,12 +243,11 @@ The contributions of this thesis are as follows:
 \end{itemize}
 
 The remainder of this thesis will follow the following structure. Background
-information on \ac{mptcp} and the mechanisms used in the implementation is
-covered in Chapter~\ref{c:bg}. Related work is discussed in Chapter~\ref{c:rw}.
-The implementation of our system is described in Chapter~\ref{c:impl}.
-Experimental evaluation is presented in Chapter~\ref{c:eval}. Finally, future
-work is discussed in Chapter~\ref{c:fw} and we conclude in
-Chapter~\ref{c:conclusion}.
+information on \ac{mptcp} and the mechanisms used in the evaluation is covered
+in Chapter~\ref{c:bg}. Related work is discussed in Chapter~\ref{c:rw}. The
+implementation of our system is described in Chapter~\ref{c:impl}. Experimental
+evaluation is presented in Chapter~\ref{c:eval}. Finally, future work is
+discussed in Chapter~\ref{c:fw} and we conclude in Chapter~\ref{c:conclusion}.
 
 \chapter{Background}
 \label{c:bg}
