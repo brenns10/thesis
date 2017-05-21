@@ -149,7 +149,17 @@
 \acresetall
 
 \begin{abstract}
-Abstract abstract abstract.
+  \ac{mptcp} is an extension to TCP which allows hosts to establish connections
+  consisting of multiple TCP ``subflows'' that travel across different Internet
+  paths. However, it is based on the assumption that at least one communicating
+  host is multi-homed. Meanwhile, the Internet contains considerable path
+  diversity, and research has shown that routes chosen by the Internet are not
+  always the most efficient. In this thesis, we implement and evaluate a
+  mechanism which allows single-homed devices to leverage \ac{mptcp} and
+  establish subflows across alternative routes. We find that this mechanism is
+  capable of significant bandwidth aggregation under appropriate network
+  conditions, and that the mechanism is deployable on today's Internet, for
+  unmodified applications.
 \end{abstract}
 
 \mainmatter
