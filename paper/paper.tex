@@ -89,6 +89,10 @@
   short = BALIA,
   long  = Balanced Linked Adaptation Algorithm
 }
+\DeclareAcronym{mcp}{
+  short = MCP,
+  long  = Multipath Conversion Point
+}
 
 \begin{document}
 \advisor{Michael Rabinovich}
@@ -451,6 +455,7 @@ routing, source routing, channel bonding, and proxying. In this chapter, we will
 examine related work at each relevant level of Internet.
 
 \section{Link Layer}
+\label{s:rw-ll}
 
 At the link layer, aggregating multiple low-capacity links to create a single,
 virtual link with higher capacity is called \emph{inverse multiplexing}, or
@@ -536,8 +541,18 @@ similar to the \ac{ron} framework's original routing system. However, they did
 not attempt to use multiple paths without redundancy, since their study focused
 on loss rates rather than throughput.
 
+Another extension of the \ac{ron} framework attempted to use a biologically
+inspired approach to multi-path routing \cite{leibnitz2006biologically}. Their
+mechanism discovers routes via an iterative broadcasting method, not unlike the
+construction of a shortest path tree. When a selection of routes is ready, the
+mechanism moves into a route maintenance mode. A main route is selected, with
+alternative routes being used as backups. Based on changes in link state, as
+well as some degree of randomness, the main route may become backup, while a
+different route is selected as the main route. As a result, this mechanism does
+not appear to achieve a high degree of aggregation.
+
 Gummadi \textit{et al.} \cite{gummadi2004improving} demonstrated a simpler
-approach to detour routing. Rather than creating a full overlay network where
+approach to detour routing. Rather than creating a full overlay network in which
 each node monitors links and maintains routing tables, they applied source
 routing. They designed \ac{sosr}, a system which tunnels traffic to an
 intermediary, which then forwards the traffic on to the destination. The
@@ -554,13 +569,99 @@ correct Internet routing inefficiencies by combining multiple paths without
 redundancy. However, transport-layer systems based on overlay networks have been
 created which do so (see Section~\ref{s:rw-transport}).
 
-\subsection{Multipath Routing}
+\subsection{Equal Cost Multi-path Routing}
 
+The \ac{mptcp} protocol specification specifically allows for subflows to be
+established from the same client address, to the same server address, with
+simply a different source port \cite{rfc6824}. One reason this is allowed is to
+enable path diversity via \ac{ecmp}. In large data center networks, highly
+redundant network topologies have been deployed, so that there are several
+routes between hosts. Such routing topologies use \ac{ecmp} to choose between
+paths that have the same cost, by using a hash of the connection 5-tuple
+\cite{raiciu2011improving}. In \cite{raiciu2011improving}, Raiciu \textit{et
+  al.} describe in detail a simulation study that evaluates the performance of
+\ac{mptcp} on several data center topologies and congestion controls. They also
+describe a validation on an Amazon EC2 data center with a highly redundant
+topology, in which using \ac{mptcp} with four subflows achieved a 3x throughput
+improvement.
 
+\subsection{Binder}
+
+Another application of \ac{mptcp} to bandwidth aggregation is Binder, a system
+for aggregating the bandwidth of several Internet gateways \cite{binder}. This
+mechanism was developed in an area of rural Scotland, containing several
+low-bandwidth gateways. Rather than use one gateway primarily and others as
+backup, Binder allows aggregation of all of the gateways.
+
+This is achieved by routing all outgoing traffic through an OpenVPN connection.
+The OpenVPN connection uses \ac{mptcp}. One subflow is dedicated to each gateway
+(using IP source routing options). The OpenVPN server, located outside of the
+local network, terminates the \ac{mptcp} connection and performs \ac{nat},
+routing all packets to their final destinations.
+
+We consider this to be a network layer mechanism since it forwards IP datagrams
+over the OpenVPN connection. As pointed out in their paper, Binder strikingly
+parallels channel-bonding techniques such as the ones described in
+Section~\ref{s:rw-ll}.
+
+Our mechanism also uses OpenVPN, but a key differentiation is that while Binder
+uses OpenVPN over \ac{mptcp}, we only put a single subflow of an \ac{mptcp}
+connection through OpenVPN.
 
 \section{Transport Layer}
 \label{s:rw-transport}
 
+\ac{mptcp}, the heart of our mechanism, is at the transport layer. It is built
+on several years of research and development, and the literature is full of work
+related to the development of multipath transport algorithms. Overviews of these
+prior works can be found in \cite{barre2011multipath,raiciu2012hard}. Most of
+these works are based on multi-homed devices, and thus not directly related to
+this thesis.
+
+However, one prior transport-layer approach is very relevant. In
+\cite{zhang2004transport}, Zhang \textit{et al.} describe the implementation of
+mTCP, an early multipath variation of TCP. Rather than using a TCP connection
+per-subflow, mTCP simply routes TCP segments across different paths. Congestion
+control is performed separately on each ``subflow'', while the receive window is
+global. Acknowledgements are transmitted on only one return path.
+
+Paths are dynamically added based on a heuristic that involves an estimated path
+disjointness metric based on traceroute and latency. Paths are suppressed when
+shared congestion is detected, and removed if they are detected to have failed.
+
+The mTCP mechanism is based on a user-space TCP implementation, and it uses
+\ac{ron} \cite{ron} as the network-layer which provides multiple routes. As a
+result, the mechanism is not directly deployable on the Internet, nor could it
+be easily made compatible with existing applications. In the years since mTCP
+was designed, \ac{mptcp} was designed and overlay networks have become less
+common. We view this thesis as a modern, compatible, and deployable take on the
+concepts in mTCP.
+
+\section{Application Layer}
+
+At the application layer, a recent \ac{mptcp} IETF working group draft proposes
+a set of proxying mechanisms that allow ISPs to improve client TCP and
+\ac{mptcp} connection throughput \cite{boucadair-mptcp-plain-mode-10}. Based on
+observations that \ac{mptcp} server deployment has not been strong, these
+mechanisms expect a server and optionally a client which do not support
+\ac{mptcp}. They proxy traffic through \acp{mcp}, devices which they deploy
+throughout the network.
+
+In the one \ac{mcp} scenario, an \ac{mptcp}-enabled client would like to use
+\ac{mptcp} to connect to a server which does not support it. It establishes a
+connection to a \ac{mcp}, specifying the final destination within the
+\texttt{SYN} segment. It may then establish additional subflows to the \ac{mcp}
+using its other interfaces. The \ac{mcp} proxies the connection data to the
+final destination via a plain TCP connection.
+
+In the two \ac{mcp} scenario, both the client and server are not \ac{mptcp}
+enabled. Instead, a TCP connection bearing an \texttt{MP\_CONVERT} TCP option is
+routed through the ISP, to an \ac{mcp}. The \ac{mcp} establishes a \ac{mptcp}
+connection to another \ac{mcp}, which will then connect to the final destination
+over TCP.
+
+These mechanisms are at the application layer, because they terminate TCP and
+\ac{mptcp} connections, acting as proxies.
 
 \chapter{Implementation}
 \label{c:impl}
