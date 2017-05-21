@@ -120,6 +120,7 @@
 \maketitle
 \makeapprovalsheet
 
+\setcounter{tocdepth}{1}
 \frontmatter
 \tableofcontents
 
@@ -644,8 +645,9 @@ a set of proxying mechanisms that allow ISPs to improve client TCP and
 \ac{mptcp} connection throughput \cite{boucadair-mptcp-plain-mode-10}. Based on
 observations that \ac{mptcp} server deployment has not been strong, these
 mechanisms expect a server and optionally a client which do not support
-\ac{mptcp}. They proxy traffic through \acp{mcp}, devices which they deploy
-throughout the network.
+\ac{mptcp}. They proxy traffic through \acp{mcp}, devices which ISPs deploy
+throughout the network. There are two possible deployment scenarios: one
+\ac{mcp} and two \ac{mcp}.
 
 In the one \ac{mcp} scenario, an \ac{mptcp}-enabled client would like to use
 \ac{mptcp} to connect to a server which does not support it. It establishes a
