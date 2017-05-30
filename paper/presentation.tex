@@ -420,6 +420,220 @@
 \end{frame}
 
 \section{Implementation}
+\SectionHead{}{
+  Time to get into the actual implementation of this project.
+}
+\subsection{Overview}
+
+\FigureSlide{figures/Concept.pdf}{
+  \begin{itemize}
+  \item Some terminology.
+  \item Active opener - ``client''
+  \item Passive opener - ``server''
+  \item Intermediary - ``detour''
+  \item This mechanism allows subflows to be created across (potentially
+    multiple) detours
+  \item (in addition to the main subflow directly from client to server)
+  \end{itemize}
+}
+
+\begin{frame}
+  \frametitle{Ingredients}
+
+  \note{
+    There are several components that go together to make this thesis work.
+  }
+
+  \begin{itemize}
+  \item Multipath TCP Linux Implementation v0.91
+  \item Custom path manager
+  \item OpenVPN
+  \item Netfilter / IPTables frameworks
+  \end{itemize}
+\end{frame}
+
+\FigureSlide{figures/MovingParts.pdf}{
+  \begin{itemize}
+  \item There are three components that make this work.
+  \item Assume server runs any MPTCP stack, unmodified
+  \item First component: Client runs Linux MPTCP with custom path manager
+  \item Second component: Client runs userspace daemon which communicates with
+    detour.
+  \item Third component: detour runs userspace daemon. Currently detour is
+    restricted to any relatively modern linux (IPTables, Netfilter). Need not
+    support MPTCP.
+  \end{itemize}
+}
+
+\subsection{Detour Daemon}
+
+\begin{frame}
+  \frametitle{Strategies for Detours}
+
+  \begin{itemize}
+  \item OpenVPN Approach
+    \begin{itemize}
+    \item Establish an OpenVPN connection with detour
+    \item Send packets as normal through the virtual interface
+    \item Packets encapsulated via OpenVPN protocol
+    \item Detour still performs NAT
+    \end{itemize}
+  \item NAT Approach
+    \begin{itemize}
+    \item Address packets directly to detour
+    \item Detour alters source and destination address, forwards packet
+    \item Address information must be arranged ahead of time
+    \end{itemize}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}
+  \frametitle{OpenVPN Approach}
+
+  \begin{itemize}
+  \item OpenVPN typically provides encryption and authentication
+    \note[item]{OpenVPN is well known for providing an encrypted VPN service.
+      While this is normally a good thing, in our use case, it is just
+      overhead.}
+  \item Configure to only provide authentication on startup, no encryption or
+    message signatures
+    \note[item]{To address this, we configure OpenVPN so that it will still
+      require X.509 keys in order to negotiate the connection. But no encryption
+      signatures will occur for data.}
+  \item Use UDP as transport, to avoid ``TCP Meltdown''
+    \note[item]{When TCP is encapsulated within itself, we can encounter the TCP
+      Meltdown effect. This is due to multiple timers in the different layers.
+      To address this, we use UDP as the transport layer.}
+  \item VPN appears as network device to the kernel
+  \item No per-MPTCP-connection signalling, but has per-packet overhead
+    \note[item]{Some advantages here again, the VPN is just a device to the
+      kernel, so this is the case MPTCP is designed to handle. There is no
+      signalling, so connections can be created immediately, but there is a
+      per-packet overhead.}
+  \end{itemize}
+
+  \note[item]{
+    \textbf{If asked about TCP Meltdown:} Packet loss causes retransmission on
+    outer TCP connection. Its retransmission timer is likely longer than the
+    inner TCP. The inner timer fires a retransmission, and exponential backoff
+    begins. Since the outer TCP is blocked until the retransmission, the inner
+    adds up more retransmissions and exponentially backs off much more, and so
+    the connection stalls quickly.
+  }
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{NAT Approach}
+
+  \begin{center}
+    \vfill
+\begin{BVerbatim}
++-----------------------------------+
+| ver(1) | op(1)  | reserved (2)    |
++-----------------------------------+
+|           rip (4 bytes)           |
++-----------------------------------+
+| rpt (2 bytes)   | dpt (2 bytes)   |
++-----------------|-----------------+
+\end{BVerbatim}
+    \vfill
+
+    Custom protocol for arranging NAT detours
+  \end{center}
+  \note[item]{The NAT approach is perhaps the most straightforward.}
+  \note[item]{The biggest issue is that a client must inform the detour of the
+    server address and port. They must also agree what port on the detour to
+    use. This protocol does this.}
+  \note[item]{The ver field is a version, currently set to 1.}
+  \note[item]{The op field is the operation, which can be either ``request'' or
+    ``response''.}
+  \note[item]{rip is the remote address to connect to}
+  \note[item]{rpt is remote port}
+  \note[item]{dpt is detour port}
+  \note[item]{In the request, dpt is simply a ``proposal'', typically the same
+    port as rpt. The detour replies back with the final choice of dpt.}
+  \note[item]{Detour may want to choose a different one due to several types of
+    port conflicts which could occur in detours, or because the proposed port
+    (e.g. 80) is open and listening, and the detour doesn't want to mask it.}
+\end{frame}
+
+\subsection{Path Manager}
+
+\begin{frame}
+  \frametitle{Path Manager}
+
+  \begin{itemize}
+  \item Once a MPTCP connection is established, path manager is informed
+  \item Path manager runs in a background thread
+  \item Requests detours from client daemon
+  \item Adds up to $N$ additional subflows, where $N$ is configurable. By
+    default $N=2$
+  \item Whenever a new detour becomes available, runs again
+  \end{itemize}
+\end{frame}
+
+\FigureSlide{figures/KernDataStruct.pdf}{
+  \begin{itemize}
+  \item The path manager holds onto some internal data
+  \item Tracks each NAT and VPN detour in lists, with timestamps
+  \item Timestamps ensure that when the worker runs again, entries in the list
+    are not reconsidered.
+  \item The internal data is not global, it exists per network-namespace.
+  \item Connections belong to network namespace, so do network interfaces.
+  \end{itemize}
+}
+
+\subsection{Client Daemon}
+
+\begin{frame}
+  \frametitle{Client Daemon}
+
+  \begin{itemize}
+  \item Userspace daemon required for tasks which are not well-suited for the
+    kernel:
+    \begin{itemize}
+    \item Starting processes
+    \item Using UDP sockets
+    \end{itemize}
+  \item Daemon reads configuration file containing NAT and VPN detours.
+  \item VPN instances are started up first and reported to kernel
+  \item Wait for detour requests from kernel, send UDP requests, report replies
+    to kernel
+  \item All communication over Generic Netlink
+  \end{itemize}
+\end{frame}
+
+\subsection{Putting it Together}
+
+\begin{frame}[t]
+  \frametitle{Putting it Together (NAT)}
+  \begin{enumerate}
+  \invisible<1>{\item[(0)] At startup, client daemon connects to VPN and reports VPN to kernel}
+  \item Application creates MPTCP connection to MPTCP supporting server
+  \item Once 3WHS completes, path manager requests a detour from client daemon
+  \item Client daemon receives request and sends UDP request to every client
+    daemon listed in configuration file
+  \item Detour daemon sets up detour, sends reply
+  \item Client daemon forwards reply to kernel
+  \item The path manager restarts the MPTCP connection's thread, which creates
+    a new subflow via this detour
+  \end{enumerate}
+  \note[item]{When you do it with a VPN, the main difference is that the VPN is
+    already created. So the path manager can immediately create a subflow
+    through the VPN, rather than waiting for a detour entry}
+\end{frame}
+
+\begin{frame}[t]
+  \frametitle{Putting it Together (VPN)}
+
+  \begin{enumerate}
+  \item[(0)] At startup, client daemon connects to VPN and reports VPN to kernel
+  \item Application creates MPTCP connection to MPTCP supporting server
+  \item Once 3WHS completes, path manager requests a detour from client daemon.
+  \item Meanwhile, it uses the VPN already available and establishes a subflow.
+  \end{enumerate}
+\end{frame}
+
 \section{Evaluation}
 \section{Conclusion}
 
