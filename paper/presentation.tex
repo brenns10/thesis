@@ -15,6 +15,10 @@
 \setbeamertemplate{note page}[plain]
 \setbeameroption{show notes on second screen=right}
 \setbeamertemplate{navigation symbols}{}%remove navigation symbols
+\AtBeginNote{%
+    \let\enumerate\itemize%
+    \let\endenumerate\enditemize%
+}
 
 \newcommand{\FigureSlide}[2]{
   \begin{frame}[plain]
@@ -30,7 +34,7 @@
 \newcommand{\SectionHead}[2]{
   \begin{frame}{#1}
     \tableofcontents[currentsection,hideallsubsections]
-    \note{#1}
+    \note{#2}
   \end{frame}
 }
 
@@ -351,6 +355,70 @@
 }
 
 \section{Related Work}
+\SectionHead{}{
+  Would love to discuss more, but limited time
+}
+
+\subsection{Overlay Networks}
+
+\begin{frame}
+  \frametitle{Resilient Overlay Networks}
+
+  \begin{itemize}
+  \item Rather than use only one detour, create an overlay network
+  \item Overlay nodes use the Internet as their ``link layer''
+    \note[item]{In Intro, discussed Detour study. RON is something of a
+      spiritual successor. Rather than simple detours, use overlay networks.}
+  \item Routing performed at each node using measured link characteristics
+    \note[item]{Each node is an Internet host. Constantly monitoring link
+      characteristics of network, updating routing tables with performance
+      metrics.}
+  \item Several studies based on RON:
+    \note[item]{RON achieved good results, was testbed for additional studies.}
+    \begin{itemize}
+    \item Redundant multipath routing
+      \note[item]{One study compared two routing strategies: adaptively choosing
+      the best path, or redundantly using multiple paths. No aggregation.}
+  \item ``Biologically inspired'' multipath routing
+    \note[item]{Another - biologically inspired. Choose strongest path as
+      primary, have several backups, involves differential equations and
+      randomness.}
+  \item mTCP \note[item]{mTCP: most important. A modification of TCP before
+      MPTCP existed. Built on RON + userspace TCP stack. Did not have MPTCP
+      compatibility concerns - routed segments across different paths. Worked on
+      single-homed devices due to RON}
+    \end{itemize}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Other Related Items}
+
+  \note[item]{Outside of overlay networks, several related pieces of work, both
+    in research and in the standards bodies.}
+
+  \begin{itemize}
+  \item Source routing (IPv4) and segment routing (IPv6)
+    \note[item]{Notable - it is possible to specify intermediaries in both IPv4
+      and IPv6. For security reasons these aren't respected. Standards exist
+      mainly for use in internal networks.}
+  \item Binder: aggregating bandwidth of several Internet gateways
+    \note[item]{One use of MPTCP that is very similar was called Binder. A rural
+      town was away from any ISP. Had several potential gateways far away, but
+      low bandwidth and not good reliability. Established connections across
+      each gateway, and created an OpenVPN connection to an Internet-side
+      server, with subflow across each.}
+  \item SOSR: Scalable One-hop Source Routing \note[item]{Work inspired by RON,
+      but trying to simplify. This work simply tunneled connections across a
+      single hop, using a NAT approach similar to ours. Found they got most of
+      RON's benefit without the full overlay system.}
+  \item IETF MPTCP proxying draft
+    \note[item]{Similar because allows single-homed devices to use MPTCP.
+      However this approach expects non MPTCP server, and is ``transparent''
+      proxy.}
+  \end{itemize}
+\end{frame}
+
 \section{Implementation}
 \section{Evaluation}
 \section{Conclusion}
