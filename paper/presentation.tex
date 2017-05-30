@@ -621,8 +621,8 @@
   \invisible<1>{\item[(0)] At startup, client daemon connects to VPN and reports VPN to kernel}
   \item Application creates MPTCP connection to MPTCP supporting server
   \item Once 3WHS completes, path manager requests a detour from client daemon
-  \item Client daemon receives request and sends UDP request to every client
-    daemon listed in configuration file
+  \item Client daemon receives request and sends UDP request to every detour
+    listed in configuration file
   \item Detour daemon sets up detour, sends reply
   \item Client daemon forwards reply to kernel
   \item The path manager restarts the MPTCP connection's thread, which creates
