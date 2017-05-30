@@ -11,14 +11,26 @@
 \usepackage{wrapfig}
 \usepackage[export]{adjustbox}
 \usepackage{graphicx}
+\usepackage{fancyvrb}
 \setbeamertemplate{note page}[plain]
 \setbeameroption{show notes on second screen=right}
 \setbeamertemplate{navigation symbols}{}%remove navigation symbols
 
 \newcommand{\FigureSlide}[2]{
   \begin{frame}[plain]
-    \includegraphics[max width=\textwidth,max height=\textheight]{#1}
+    \begin{centering}
+      \vfill
+      \includegraphics[max width=\textwidth,max height=\textheight]{#1}
+      \vfill
+      \end{centering}
     \note{#2}
+  \end{frame}
+}
+
+\newcommand{\SectionHead}[2]{
+  \begin{frame}{#1}
+    \tableofcontents[currentsection,hideallsubsections]
+    \note{#1}
   \end{frame}
 }
 
@@ -31,8 +43,10 @@
   }
 }
 
+\section{Introduction}
+
 \begin{frame}{Overview}
-  \tableofcontents
+  \tableofcontents[hideallsubsections]
   \note{
     Here is how this talk is going to be structured. First, I'll be giving a bit
     of motivation for this project, along with a problem statement and our
@@ -43,8 +57,6 @@
     we'll conclude with a brief summary and discussion of future work.
   }
 \end{frame}
-
-\section{Introduction}
 
 \FigureSlide{figures/InternetSlide.pdf}{
   Okay, so let's get started! I want to start off with a brief and simplified
@@ -190,6 +202,8 @@
 \end{frame}
 
 \section{Background}
+\SectionHead{}{}
+\subsection{Multipath TCP}
 
 \begin{frame}
   \frametitle{Multipath TCP}
@@ -208,6 +222,11 @@
     addresses in the same connection
   \end{itemize}
     \note{
+
+      This project is based on MPTCP. While it's not my intent to give a
+      comprehensive protocol description in this presentation, I do want to give
+      enough background to understand how my project uses it.
+
       Recently, we've seen a rise in devices that have multiple ways to connect
       to the Internet, network interfaces. For instance, smartphones include
       cellular and WiFi radios, and can be connected to the Internet on both.
@@ -225,6 +244,111 @@
       interfaces and addresses in a single connection.
     }
 \end{frame}
+
+\begin{frame}{Design Goals}
+
+  \begin{itemize}
+  \item Improve performance and reliability over current TCP, by aggregating
+    paths created by multiple interfaces.
+  \item Do no harm to single-path TCP, by taking no more bandwidth over shared
+    bottlenecks than standard TCP would
+  \item Remain compatible with TCP applications and the Internet
+    \begin{itemize}
+    \item Present the same socket API to applications
+    \item Remain similar to TCP on the wire, to remain compatible with Internet
+      middleboxes
+    \end{itemize}
+  \end{itemize}
+  \note{
+    As a protocol, MPTCP has a few key design goals. First, it is designed to
+    improve performance and reliability compared to standard TCP. Second, it
+    should not do any harm to existing single-path TCP. Third, it should remain
+    compatible to applications and to the Internet as a whole.
+  }
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Architecture}
+  \begin{center}
+\begin{BVerbatim}
+                     +-------------------------------+
+                     |           Application         |
++---------------+    +-------------------------------+
+|  Application  |    |             MPTCP             |
++---------------+    + - - - - - - - + - - - - - - - +
+|      TCP      |    | Subflow (TCP) | Subflow (TCP) |
++---------------+    +-------------------------------+
+|      IP       |    |       IP      |      IP       |
++---------------+    +-------------------------------+
+\end{BVerbatim}
+  \end{center}
+  \note{
+    The way that MPTCP achieves this is by layering the protocol extension in
+    between TCP and the application layer. An MPTCP connection consists of one
+    or more (well, potentially zero or more) TCP connections, which we refer to
+    as ``subflows''. These subflows bear some extra TCP options which provide
+    signaling information, but other than that they behave very similarly to
+    standard TCP. The only major difference is that their receive window is
+    shared, rather than per-subflow. The MPTCP connection has its own sequence
+    numbers, and each subflow has independent sequence numbers as well.
+  }
+\end{frame}
+
+\begin{frame}
+  \frametitle{Path Management}
+
+  \begin{itemize}
+  \item Subflows are established with a three way handshake
+  \item First subflow uses \texttt{MP\_CAPABLE} option
+  \item Subsequent subflows use \texttt{MP\_JOIN} option
+  \item Additional addresses may be advertised using \texttt{ADD\_ADDR} at any
+    time
+  \item Either side may create new subflows at any time
+  \end{itemize}
+  \note{
+
+    When we create an MPTCP connection, a three-way handshake occurs, just like
+    standard TCP. However, the three-way handshake includes the MP CAPABLE
+    option, signalling to the other host that it supports MPTCP. A SYNACK with
+    MP CAPABLE signals that the passive opener supports MPTCP as well, and the
+    final ACK with MP CAPABLE confirms the use of MPTCP. The contents of these
+    options are key material, which is used to authenticate creation of new
+    subflows.
+
+    Subsequent subflows are created with a similar procedure, but using the MP
+    JOIN option. The contents of the option this time are HMAC signatures based
+    on the key material. If the HMAC can be verified, the hosts can be certain
+    that they are communicating with the same host they initially established a
+    connection with.
+
+    An MPTCP implementation may advertise that it has additional addresses (and
+    therefore additional interfaces) via an ADD ADDR option. There is also
+    support for deletion.
+
+    Finally, the MPTCP specification says nothing about when subflows should be
+    created or destroyed. This is entirely left up to local policy, and of
+    course research. In the Linux kernel implementation of MPTCP, a module
+    interface exists for this, called the path manager.
+
+  }
+\end{frame}
+
+\FigureSlide{figures/DataScheduling.pdf}{
+
+  So, now that we have subflows, what do we do with them? How do we get data
+  through them to the other application? Well, we do this with two important
+  concepts: a data scheduler and the data sequence mapping.
+
+  Imagine one host wants to send some data. It passes it through the send system
+  call, and eventually the MPTCP stack has a large piece of data. A component
+  called the scheduler gets to make the executive decision of how to divide up
+  the data. It does this however it pleases, and the chunks make their way down
+  to the subflows.
+
+  In order to be able to put them back together, a data sequence signal is sent
+  on the subflow.
+
+}
 
 \section{Related Work}
 \section{Implementation}
