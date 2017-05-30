@@ -31,6 +31,16 @@
   \end{frame}
 }
 
+\newcommand{\TitledFigureSlide}[2]{
+  \begin{frame}{#1}
+    \begin{centering}
+      \vfill
+      \includegraphics[max width=\textwidth,max height=\textheight]{#1}
+      \vfill
+      \end{centering}
+  \end{frame}
+}
+
 \newcommand{\SectionHead}[2]{
   \begin{frame}{#1}
     \tableofcontents[currentsection,hideallsubsections]
@@ -635,9 +645,113 @@
 \end{frame}
 
 \section{Evaluation}
+\SectionHead{}{}
+
+\begin{frame}
+  \frametitle{Types of Experiment}
+
+  \begin{itemize}
+  \item Previous work has established that there do exist common scenarios where
+    detour routing can improve path characteristics
+  \item These experiments do not duplicate results
+  \item Answer the following:
+    \begin{itemize}
+    \item Given a network where an alternative route has better properties, can
+      this mechanism effectively use it?
+    \item Given a network where there is an alternative route and the potential
+      for aggregation, can this mechanism aggregate throughput?
+    \item Can this mechanism run without modification on the Internet?
+    \end{itemize}
+  \end{itemize}
+\end{frame}
+
+\subsection{Mininet Experiments}
+
+\begin{frame}
+  \frametitle{Mininet Experiments}
+
+  \begin{itemize}
+  \item Mininet allows you to create arbitrary network topologies
+  \item Uses host networking stack rather than alternative or simulation
+  \item Uses namespacing (foundation of containerization) rather than
+    virtualization
+  \end{itemize}
+\end{frame}
+
+\FigureSlide{figures/Topology.pdf}{
+  \begin{itemize}
+  \item This is network topology we us
+  \item Has path diversity, a client, a server, a detour
+  \item Each link has 5ms delay.
+  \end{itemize}
+}
+
+\begin{frame}
+  \frametitle{Scenarios}
+
+  \begin{itemize}
+  \item Two types of network:
+    \begin{itemize}
+    \item \textbf{Symmetric:} every link has 10Mbps bandwidth
+    \item \textbf{Core-limited:} core links have 10Mbps, access links have 20Mbps
+    \end{itemize}
+  \item Three variations:
+    \begin{itemize}
+    \item \textbf{Normal:} no loss
+    \item \textbf{Lossy:} 1\% packet loss on Link 2
+    \item \textbf{Delayed:} 100ms delay on Link 2
+    \end{itemize}
+  \item Total of 6 scenarios
+  \end{itemize}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Mechanisms}
+
+  \begin{itemize}
+  \item \textbf{1-Subflow:} MPTCP with no available detours
+  \item \textbf{NAT:} Using NAT detour
+  \item \textbf{VPN:} Using VPN detour
+  \item \textbf{TCP:} TCP over default route
+  \item \textbf{TCP(NAT):} TCP via the NAT tunnel
+  \item \textbf{TCP(VPN):} TCP via the VPN tunnel
+  \end{itemize}
+  \note[item]{Don't forget to say we use iperf to measure throughput}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Results}
+\end{frame}
+
+\FigureSlide{figures/sym.pdf}{
+  \begin{itemize}
+  \item This is
+  \end{itemize}
+}
+
 \section{Conclusion}
 
 \appendix % slide numbering includes nothing after here
+
+\section{All Figures}
+\TitledFigureSlide{figures/sym.pdf}{Throughput Comparison, Symmetric}
+\TitledFigureSlide{figures/timegrid-sym.pdf}{Timelapse, Symmetric}
+
+\TitledFigureSlide{figures/sym-lossy.pdf}{Throughput Comparison, Symmetric with Loss}
+\TitledFigureSlide{figures/timegrid-sym-lossy.pdf}{Timelapse, Symmetric with Loss}
+
+\TitledFigureSlide{figures/sym-delayed.pdf}{Throughput Comparison, Symmetric with Delay}
+\TitledFigureSlide{figures/timegrid-sym-delayed.pdf}{Timelapse, Symmetric with Delay}
+
+
+\TitledFigureSlide{figures/easy.pdf}{Throughput Comparison, Core-limited}
+\TitledFigureSlide{figures/timegrid-easy.pdf}{Timelapse, Core-limited}
+
+\TitledFigureSlide{figures/easy-lossy.pdf}{Throughput Comparison, Core-limited with Loss}
+\TitledFigureSlide{figures/timegrid-easy-lossy.pdf}{Timelapse, Core-limited with Loss}
+
+\TitledFigureSlide{figures/easy-delayed.pdf}{Throughput Comparison, Core-limited with Delay}
+\TitledFigureSlide{figures/timegrid-easy-delayed.pdf}{Timelapse, Core-limited with Delay}
 
 \section{References}
 \begin{frame}[allowframebreaks]
