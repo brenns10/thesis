@@ -32,7 +32,7 @@
 }
 
 \newcommand{\TitledFigureSlide}[2]{
-  \begin{frame}{#1}
+  \begin{frame}{#2}
     \begin{centering}
       \vfill
       \includegraphics[max width=\textwidth,max height=\textheight]{#1}
@@ -725,9 +725,118 @@
 
 \FigureSlide{figures/sym.pdf}{
   \begin{itemize}
-  \item This is
+  \item This is a comparison of throughput on Symmetric, Normal. takeaways:
+  \item (1) MPTCP is more variable than TCP
+  \item (2) The VPN and NAT approaches don't perform as well when there is
+    nothing to gain. This seems to be a result of their overhead and maybe
+    congestion control.
   \end{itemize}
 }
+
+\begin{frame}
+  \frametitle{Results}
+
+  \begin{itemize}
+  \item MPTCP trials are more variable
+  \item Mechanism introduces overhead when there is no potential for gain
+  \end{itemize}
+\end{frame}
+
+\FigureSlide{figures/sym-lossy.pdf}{
+  \begin{itemize}
+  \item When a small loss rate is added, the story begins to change.
+  \item Suddenly, MPTCP NAT and VPN are performing very comparably to vanilla
+    TCP over those same paths
+  \item MPTCP 1 subflow takes a huge performance hit
+  \end{itemize}
+}
+
+\begin{frame}
+  \frametitle{Results}
+
+  \begin{itemize}
+  \item MPTCP trials are more variable
+  \item Mechanism introduces overhead when there is no potential for gain
+  \item Mechanism performs similarly to TCP over best path when the default path
+    has loss
+  \end{itemize}
+\end{frame}
+
+\FigureSlide{figures/easy.pdf}{
+  \begin{itemize}
+  \item When there is the potential to aggregate throughput, the story changes
+    again.
+  \item The mechanism is capable of aggregating nearly all bandwidth
+  \end{itemize}
+}
+
+\begin{frame}
+  \frametitle{Results}
+
+  \begin{itemize}
+  \item MPTCP trials are more variable
+  \item Mechanism introduces overhead when there is no potential for gain
+  \item Mechanism performs similarly to TCP over best path when the default path
+    has loss
+  \item Mechanism can effectively aggregate bandwidth when the network has the
+    potential
+  \end{itemize}
+\end{frame}
+
+\FigureSlide{figures/lossy.pdf}{
+  \begin{itemize}
+  \item With the lossy link, it still works
+  \end{itemize}
+}
+
+\begin{frame}
+  \frametitle{Results}
+
+  \begin{itemize}
+  \item MPTCP trials are more variable
+  \item Mechanism introduces overhead when there is no potential for gain
+  \item Mechanism performs similarly to TCP over best path when the default path
+    has loss
+  \item Mechanism can effectively aggregate bandwidth when the network has the
+    potential, even in the presence of loss
+  \end{itemize}
+\end{frame}
+
+\FigureSlide{figures/delayed.pdf}{
+  \begin{itemize}
+  \item With delayed link, there are some funky interactions with slow slow
+    start, but MPTCP still outperforms the best paths
+  \end{itemize}
+}
+
+\begin{frame}
+  \frametitle{Results}
+
+  \begin{itemize}
+  \item MPTCP trials are more variable
+  \item Mechanism introduces overhead when there is no potential for gain
+  \item Mechanism performs similarly to TCP over best path when the default path
+    has loss
+  \item Mechanism can effectively aggregate bandwidth when the network has the
+    potential, even in the presence of loss or high latency
+  \item<2> NAT consistently outperforms VPN both in MPTCP and TCP, but by a small
+    amount.
+  \end{itemize}
+\end{frame}
+
+\subsection{AWS Experiments}
+\begin{frame}
+  \frametitle{AWS Experiments}
+
+  \begin{itemize}
+  \item Deployed client, server, and detour implementations to different AWS
+    regions
+  \item Ran similar throughput measurements for MPTCP
+  \item Performed at much higer level, but didn't show similar improvements
+  \end{itemize}
+\end{frame}
+
+\FigureSlide{figures/aws.pdf}{}
 
 \section{Conclusion}
 
@@ -747,11 +856,14 @@
 \TitledFigureSlide{figures/easy.pdf}{Throughput Comparison, Core-limited}
 \TitledFigureSlide{figures/timegrid-easy.pdf}{Timelapse, Core-limited}
 
-\TitledFigureSlide{figures/easy-lossy.pdf}{Throughput Comparison, Core-limited with Loss}
-\TitledFigureSlide{figures/timegrid-easy-lossy.pdf}{Timelapse, Core-limited with Loss}
+\TitledFigureSlide{figures/lossy.pdf}{Throughput Comparison, Core-limited with Loss}
+\TitledFigureSlide{figures/timegrid-lossy.pdf}{Timelapse, Core-limited with Loss}
 
-\TitledFigureSlide{figures/easy-delayed.pdf}{Throughput Comparison, Core-limited with Delay}
-\TitledFigureSlide{figures/timegrid-easy-delayed.pdf}{Timelapse, Core-limited with Delay}
+\TitledFigureSlide{figures/delayed.pdf}{Throughput Comparison, Core-limited with Delay}
+\TitledFigureSlide{figures/timegrid-delayed.pdf}{Timelapse, Core-limited with Delay}
+
+\TitledFigureSlide{figures/aws.pdf}{Throughput Comparison, AWS}
+\TitledFigureSlide{figures/timegrid-aws.pdf}{Timelapse, AWS}
 
 \section{References}
 \begin{frame}[allowframebreaks]
