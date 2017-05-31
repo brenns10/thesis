@@ -51,6 +51,14 @@
   \end{frame}
 }
 
+% fuckit
+\newcommand{\mycitetext}[1]{
+  \citeauthor{#1}. \citetitle{#1}. \citeyear{#1}
+}
+\newcommand{\mycite}[1]{
+  \footnote{\mycitetext{#1}}
+}
+
 \begin{document}
 \frame{
   \titlepage
@@ -118,7 +126,7 @@
     \textit{Example of an inefficient default route \footnotemark[1]}
   \end{column}
   \end{columns}
-  \footcitetext{detour}
+  \footnotetext{\mycitetext{detour}}
   \note{
 
     \begin{itemize}
@@ -160,7 +168,7 @@
   \begin{itemize}
   \item Fiber-to-the-home is coming!
   \item However, residential bandwidth is not fully utilized
-    \footcite{fibertothehome}
+    \mycite{fibertothehome}
     \begin{itemize}
     \item Short-lived TCP sessions?
     \item Small TCP initial window?
@@ -386,7 +394,7 @@
 \subsection{Overlay Networks}
 
 \begin{frame}
-  \frametitle{Resilient Overlay Networks\footcite{ron}}
+  \frametitle{Resilient Overlay Networks\mycite{ron}}
 
   \begin{itemize}
   \item Rather than use only one detour, create an overlay network
@@ -400,15 +408,15 @@
   \item Several studies based on RON:
     \note[item]{RON achieved good results, was testbed for additional studies.}
     \begin{itemize}
-    \item Redundant multipath routing\footcite{andersen2003best}
+    \item Redundant multipath routing\mycite{andersen2003best}
       \note[item]{One study compared two routing strategies: adaptively choosing
       the best path, or redundantly using multiple paths. No aggregation.}
   \item ``Biologically inspired'' multipath routing
-    \footcite{leibnitz2006biologically}
+    \mycite{leibnitz2006biologically}
     \note[item]{Another - biologically inspired. Choose strongest path as
       primary, have several backups, involves differential equations and
       randomness.}
-  \item mTCP \footcite{zhang2004transport}
+  \item mTCP \mycite{zhang2004transport}
     \note[item]{mTCP: most important. A modification of TCP before
       MPTCP existed. Built on RON + userspace TCP stack. Did not have MPTCP
       compatibility concerns - routed segments across different paths. Worked on
@@ -429,13 +437,13 @@
       and IPv6. For security reasons these aren't respected. Standards exist
       mainly for use in internal networks.}
   \item Binder: aggregating bandwidth of several Internet gateways
-    \footcite{binder}
+    \mycite{binder}
     \note[item]{One use of MPTCP that is very similar was called Binder. A rural
       town was away from any ISP. Had several potential gateways far away, but
       low bandwidth and not good reliability. Established connections across
       each gateway, and created an OpenVPN connection to an Internet-side
       server, with subflow across each.}
-  \item SOSR: Scalable One-hop Source Routing \footcite{gummadi2004improving}
+  \item SOSR: Scalable One-hop Source Routing \mycite{gummadi2004improving}
     \note[item]{Work inspired by RON,
       but trying to simplify. This work simply tunneled connections across a
       single hop, using a NAT approach similar to ours. Found they got most of
