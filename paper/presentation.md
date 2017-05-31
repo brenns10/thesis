@@ -13,3 +13,30 @@ Here's a rough breakdown of how much time I want to spend on each section:
 - Mechanism (18 minutes)
 - Evaluation (7 minutes)
 - Conclusion (5 minutes)
+
+Rehearsal Comments
+------------------
+
+- [x] Number slides!
+- [ ] In overview - no point about the "idea"
+- [ ] Shortest path - in terms of AS hops
+- [ ] See if you can squeeze actual paper refs
+- [ ] Cut these "We are going to move right along" transitions. Rather, "before
+  explaining my solution to ... let us briefly survey the background information
+  on MPTCP and related work". E.g., your transition to Rel Work was fine.
+- [ ] Mention that MPTCP API to apps is unchanged.
+- [ ] Check how much apps are affected by mTCP
+- [ ] Avoid statements like "A last piece of rel work" - you can never claim you
+  found the last re. work.
+- [ ] Perhaps title the slide with with triangular communication "Idea
+  Overview"?
+- [ ] Have a diagram for interaction between components on the client?
+  - In particular, this comment means to show graphically the steps that happen
+    for a run of the mechanism (arrow showing request moving through, etc)
+- [ ] Evaluation of the overhead?
+- [ ] What is the workload in your experiments?
+- [ ] Detour collective - sharing economy?
+- [ ] Related work - mention HTTP range requests and requesting embedded objects
+  in parallel from different server replicas
+- [ ] (**Big One**) Use packet trace to see what fraction of data went along
+  each subflow.
