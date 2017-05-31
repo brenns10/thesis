@@ -386,7 +386,7 @@
 \subsection{Overlay Networks}
 
 \begin{frame}
-  \frametitle{Resilient Overlay Networks}
+  \frametitle{Resilient Overlay Networks\footcite{ron}}
 
   \begin{itemize}
   \item Rather than use only one detour, create an overlay network
@@ -400,14 +400,16 @@
   \item Several studies based on RON:
     \note[item]{RON achieved good results, was testbed for additional studies.}
     \begin{itemize}
-    \item Redundant multipath routing
+    \item Redundant multipath routing\footcite{andersen2003best}
       \note[item]{One study compared two routing strategies: adaptively choosing
       the best path, or redundantly using multiple paths. No aggregation.}
   \item ``Biologically inspired'' multipath routing
+    \footcite{leibnitz2006biologically}
     \note[item]{Another - biologically inspired. Choose strongest path as
       primary, have several backups, involves differential equations and
       randomness.}
-  \item mTCP \note[item]{mTCP: most important. A modification of TCP before
+  \item mTCP \footcite{zhang2004transport}
+    \note[item]{mTCP: most important. A modification of TCP before
       MPTCP existed. Built on RON + userspace TCP stack. Did not have MPTCP
       compatibility concerns - routed segments across different paths. Worked on
       single-homed devices due to RON}
@@ -427,12 +429,14 @@
       and IPv6. For security reasons these aren't respected. Standards exist
       mainly for use in internal networks.}
   \item Binder: aggregating bandwidth of several Internet gateways
+    \footcite{binder}
     \note[item]{One use of MPTCP that is very similar was called Binder. A rural
       town was away from any ISP. Had several potential gateways far away, but
       low bandwidth and not good reliability. Established connections across
       each gateway, and created an OpenVPN connection to an Internet-side
       server, with subflow across each.}
-  \item SOSR: Scalable One-hop Source Routing \note[item]{Work inspired by RON,
+  \item SOSR: Scalable One-hop Source Routing \footcite{gummadi2004improving}
+    \note[item]{Work inspired by RON,
       but trying to simplify. This work simply tunneled connections across a
       single hop, using a NAT approach similar to ours. Found they got most of
       RON's benefit without the full overlay system.}

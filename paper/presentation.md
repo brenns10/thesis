@@ -20,7 +20,7 @@ Rehearsal Comments
 - [x] Number slides!
 - [ ] In overview - no point about the "idea"
 - [ ] Shortest path - in terms of AS hops
-- [ ] See if you can squeeze actual paper refs
+- [x] See if you can squeeze actual paper refs
 - [ ] Cut these "We are going to move right along" transitions. Rather, "before
   explaining my solution to ... let us briefly survey the background information
   on MPTCP and related work". E.g., your transition to Rel Work was fine.
