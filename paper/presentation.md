@@ -19,7 +19,7 @@ Rehearsal Comments
 
 - [x] Number slides!
 - [ ] In overview - no point about the "idea"
-- [ ] Shortest path - in terms of AS hops
+- [x] Shortest path - in terms of AS hops
 - [x] See if you can squeeze actual paper refs
 - [x] Cut these "We are going to move right along" transitions. Rather, "before
   explaining my solution to ... let us briefly survey the background information
@@ -28,7 +28,7 @@ Rehearsal Comments
 - [ ] Check how much apps are affected by mTCP
 - [x] Avoid statements like "A last piece of rel work" - you can never claim you
   found the last re. work.
-- [ ] Perhaps title the slide with with triangular communication "Idea
+- [x] Perhaps title the slide with with triangular communication "Idea
   Overview"?
 - [ ] Have a diagram for interaction between components on the client?
   - In particular, this comment means to show graphically the steps that happen

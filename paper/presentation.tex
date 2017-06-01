@@ -34,13 +34,14 @@
   \end{frame}
 }
 
-\newcommand{\TitledFigureSlide}[2]{
+\newcommand{\TitledFigureSlide}[3]{
   \begin{frame}{#2}
     \begin{centering}
       \vfill
       \includegraphics[max width=\textwidth,max height=\textheight]{#1}
       \vfill
       \end{centering}
+      \note{#3}
   \end{frame}
 }
 
@@ -89,7 +90,7 @@
   }
 \end{frame}
 
-\FigureSlide{figures/InternetSlide.pdf}{
+\TitledFigureSlide{figures/InternetSlide.pdf}{Internet Architecture}{
 
   \textbf{Transition:} I would like to start this talk with a brief, simplified
   look at routing on the Internet.
@@ -469,7 +470,7 @@
 }
 \subsection{Overview}
 
-\FigureSlide{figures/Concept.pdf}{
+\TitledFigureSlide{figures/Concept.pdf}{Concept Overview}{
   \begin{itemize}
   \item Some terminology.
   \item Active opener - ``client''
@@ -904,26 +905,26 @@
 \appendix % slide numbering includes nothing after here
 
 \section{All Figures}
-\TitledFigureSlide{figures/sym.pdf}{Throughput Comparison, Symmetric}
-\TitledFigureSlide{figures/timegrid-sym.pdf}{Timelapse, Symmetric}
+\TitledFigureSlide{figures/sym.pdf}{Throughput Comparison, Symmetric}{}
+\TitledFigureSlide{figures/timegrid-sym.pdf}{Timelapse, Symmetric}{}
 
-\TitledFigureSlide{figures/sym-lossy.pdf}{Throughput Comparison, Symmetric with Loss}
-\TitledFigureSlide{figures/timegrid-sym-lossy.pdf}{Timelapse, Symmetric with Loss}
+\TitledFigureSlide{figures/sym-lossy.pdf}{Throughput Comparison, Symmetric with Loss}{}
+\TitledFigureSlide{figures/timegrid-sym-lossy.pdf}{Timelapse, Symmetric with Loss}{}
 
-\TitledFigureSlide{figures/sym-delayed.pdf}{Throughput Comparison, Symmetric with Delay}
-\TitledFigureSlide{figures/timegrid-sym-delayed.pdf}{Timelapse, Symmetric with Delay}
+\TitledFigureSlide{figures/sym-delayed.pdf}{Throughput Comparison, Symmetric with Delay}{}
+\TitledFigureSlide{figures/timegrid-sym-delayed.pdf}{Timelapse, Symmetric with Delay}{}
 
 
-\TitledFigureSlide{figures/easy.pdf}{Throughput Comparison, Core-limited}
-\TitledFigureSlide{figures/timegrid-easy.pdf}{Timelapse, Core-limited}
+\TitledFigureSlide{figures/easy.pdf}{Throughput Comparison, Core-limited}{}
+\TitledFigureSlide{figures/timegrid-easy.pdf}{Timelapse, Core-limited}{}
 
-\TitledFigureSlide{figures/lossy.pdf}{Throughput Comparison, Core-limited with Loss}
-\TitledFigureSlide{figures/timegrid-lossy.pdf}{Timelapse, Core-limited with Loss}
+\TitledFigureSlide{figures/lossy.pdf}{Throughput Comparison, Core-limited with Loss}{}
+\TitledFigureSlide{figures/timegrid-lossy.pdf}{Timelapse, Core-limited with Loss}{}
 
-\TitledFigureSlide{figures/delayed.pdf}{Throughput Comparison, Core-limited with Delay}
-\TitledFigureSlide{figures/timegrid-delayed.pdf}{Timelapse, Core-limited with Delay}
+\TitledFigureSlide{figures/delayed.pdf}{Throughput Comparison, Core-limited with Delay}{}
+\TitledFigureSlide{figures/timegrid-delayed.pdf}{Timelapse, Core-limited with Delay}{}
 
-\TitledFigureSlide{figures/aws.pdf}{Throughput Comparison, AWS}
-\TitledFigureSlide{figures/timegrid-aws.pdf}{Timelapse, AWS}
+\TitledFigureSlide{figures/aws.pdf}{Throughput Comparison, AWS}{}
+\TitledFigureSlide{figures/timegrid-aws.pdf}{Timelapse, AWS}{}
 
 \end{document}
