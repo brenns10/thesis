@@ -179,24 +179,21 @@
   \end{itemize}
 
   \note{
-    Now let's take a brief detour and discuss something else. Recently, we've
-    been seeing some exciting trends in residential bandwidth. New access links
-    are always being created, and the latest improvement is fiber to the home.
-    These can provide up to Gigabit speeds to a home network. However, we've
-    had studies right here at CWRU showing that these residential links don't
-    use most of that capacity.
 
-    There are several good explanations for this. Short lived TCP sessions may
-    never leave the slow-start stage. A small TCP initial window will limit the
-    throughput that can be achieved in a reasonable amount of time. But there's
-    also the possibility that the network core is becoming the bottleneck for
-    some of these connections.
+    \textbf{Transition:} Take a brief detour and discuss residential access
+    speeds. (lol detour)
 
-    Two things seem to follow. First, there are good chances that a detour route
-    could provide better throughput for a TCP connection, as studies have
-    already demonstrated. Second, if we have extra access link capacity, why not
-    use these paths in combination with each other, rather than choosing only
-    one?
+    \begin{itemize}
+    \item Residential access links always increasing
+    \item Dial-up, broadband, cable, now fiber-to-the-home
+    \item Local study on fiber connections shows bandwidth not fully utilized
+      (go over each possibility, incl send buffer ``anemia'')
+    \item If network core can't support bandwidth, the detour routing approach
+      can help
+    \item If we have plenty of access bandwidth, why not aggregate paths we have
+      available to us?
+    \end{itemize}
+
   }
 \end{frame}
 
@@ -221,24 +218,29 @@
   \item An evaluation of this mechanism on emulated and real-world networks.
   \end{itemize}
   \note{
-    Putting this together, we have a problem: routing inefficiencies can prevent
-    TCP connections from achieving their full potential throughput. Access links
-    may be capable of much better bandwidth than a user actually gets.
 
-    Our solution is to create a system which can use and aggregate alternative
-    paths for TCP connections. Using these paths means that it can route traffic
-    along them. Aggregation means combining the potential throughput of both
-    paths, to get better throughput than either.
+    \begin{itemize}
+    \item Putting together, problem: routing inefficiencies can prevent TCP
+      connections from achieving throughput.
+    \item Furthermore, while detour approaches are plentiful, and even a few
+      which use multiple paths, as well as application-level strategies, there
+      are no strategies which are usable by unmodified applications
+    \item A solution could be a system which uses and aggregates alternative
+      routes for MPTCP connections.
+    \item Contribution 1 - a mechanism for adding new routes to MPTCP
+      connections which are single-homed, with no modification to applications.
+    \item Contribution 2 - experimental validation that the mechanism works,
+      even at higher throughputs
+    \end{itemize}
 
-    The contributions this thesis makes are twofold: first, a mechanism that
-    allows single-homed devices to add subflows along alternative routes via
-    MPTCP. Second, an evaluation of this system on emulated and real world
-    networks.
   }
 \end{frame}
 
 \section{Background}
-\SectionHead{}{}
+\SectionHead{}{
+  \textbf{Transition:} Before explaining my solution in more detail, we'll need
+  some background on Multipath TCP.
+}
 \subsection{Multipath TCP}
 
 \begin{frame}
@@ -259,47 +261,46 @@
   \end{itemize}
     \note{
 
-      This project is based on MPTCP. While it's not my intent to give a
-      comprehensive protocol description in this presentation, I do want to give
-      enough background to understand how my project uses it.
+      \begin{itemize}
+      \item Project is based on MPTCP, which enables multi-path transport for
+        unmodified applications in a way not possible before
+      \item Purpose is not to give complete description of MPTCP, but an
+        overview
+      \item Canonical motivation for MPTCP: smartphone with multiple interfaces.
+      \item Also servers in datacenters (redundant topo) or laptops (wifi,
+        ethernet, cell?)
+      \item \textit{(See remaining slide bullets, they're good)}
+      \end{itemize}
 
-      Recently, we've seen a rise in devices that have multiple ways to connect
-      to the Internet, network interfaces. For instance, smartphones include
-      cellular and WiFi radios, and can be connected to the Internet on both.
-      Recent data centers have been taking advantage of multiple interfaces and
-      highly redundant network topologies. Laptops can also contain WiFi,
-      Ethernet, and even cellular radios.
-
-      Unfortunately, TCP was designed for a simpler time, when computers had a
-      single interface and their addresses never changed. This forces
-      multi-homed devices to decide which interface they'll use and stick to
-      that choice.
-
-      Multipath TCP aims to solve this problem. It is an extension to TCP (not a
-      replacement) that allows devices to make use of all of their network
-      interfaces and addresses in a single connection.
     }
 \end{frame}
 
 \begin{frame}{Design Goals}
 
   \begin{itemize}
+  \item Remain compatible with TCP applications and the Internet
+    \begin{itemize}
+    \item \textit{Present the same socket API to applications}
+    \item Remain similar to TCP on the wire, to remain compatible with Internet
+      middleboxes
+    \end{itemize}
   \item Improve performance and reliability over current TCP, by aggregating
     paths created by multiple interfaces.
   \item Do no harm to single-path TCP, by taking no more bandwidth over shared
     bottlenecks than standard TCP would
-  \item Remain compatible with TCP applications and the Internet
-    \begin{itemize}
-    \item Present the same socket API to applications
-    \item Remain similar to TCP on the wire, to remain compatible with Internet
-      middleboxes
-    \end{itemize}
   \end{itemize}
   \note{
-    As a protocol, MPTCP has a few key design goals. First, it is designed to
-    improve performance and reliability compared to standard TCP. Second, it
-    should not do any harm to existing single-path TCP. Third, it should remain
-    compatible to applications and to the Internet as a whole.
+
+    \textbf{Transition:} Multipath TCP's design is motivated by several goals.
+
+    \begin{itemize}
+    \item Primary goal: compatibility
+    \item Particularly API compatibility. Runs with unmodified applications
+    \item Internet compat too. Middleboxes (NAT, Firewall, Normalizers, etc)
+      should not be confused by, or corrupt, MPTCP
+    \item Remaining two: performance, but not at the expense of existing TCP
+    \end{itemize}
+
   }
 \end{frame}
 
@@ -319,14 +320,19 @@
 \end{BVerbatim}
   \end{center}
   \note{
-    The way that MPTCP achieves this is by layering the protocol extension in
-    between TCP and the application layer. An MPTCP connection consists of one
-    or more (well, potentially zero or more) TCP connections, which we refer to
-    as ``subflows''. These subflows bear some extra TCP options which provide
-    signaling information, but other than that they behave very similarly to
-    standard TCP. The only major difference is that their receive window is
-    shared, rather than per-subflow. The MPTCP connection has its own sequence
-    numbers, and each subflow has independent sequence numbers as well.
+
+    \begin{itemize}
+    \item Achieved by layering between TCP and application
+    \item \textbf{Presents exact same API}
+    \item \textbf{Unmodified applications can use it}
+    \item Rather than creating single TCP flow, create MPTCP ``connection''
+      which may contain multiple ``subflows''
+    \item Subflows look very similar to regular TCP, except some TCP options
+    \item Share receive window
+    \item Subflows have independent sequence numbers
+    \item Data has sequence numbers too
+    \end{itemize}
+
   }
 \end{frame}
 
@@ -340,55 +346,39 @@
   \item Additional addresses may be advertised using \texttt{ADD\_ADDR} at any
     time
   \item Either side may create new subflows at any time
+  \item Spec says nothing about when they should be created, left up to policy
+  \item Kernel uses modular path manager interface for this
   \end{itemize}
   \note{
-
-    When we create an MPTCP connection, a three-way handshake occurs, just like
-    standard TCP. However, the three-way handshake includes the MP CAPABLE
-    option, signalling to the other host that it supports MPTCP. A SYNACK with
-    MP CAPABLE signals that the passive opener supports MPTCP as well, and the
-    final ACK with MP CAPABLE confirms the use of MPTCP. The contents of these
-    options are key material, which is used to authenticate creation of new
-    subflows.
-
-    Subsequent subflows are created with a similar procedure, but using the MP
-    JOIN option. The contents of the option this time are HMAC signatures based
-    on the key material. If the HMAC can be verified, the hosts can be certain
-    that they are communicating with the same host they initially established a
-    connection with.
-
-    An MPTCP implementation may advertise that it has additional addresses (and
-    therefore additional interfaces) via an ADD ADDR option. There is also
-    support for deletion.
-
-    Finally, the MPTCP specification says nothing about when subflows should be
-    created or destroyed. This is entirely left up to local policy, and of
-    course research. In the Linux kernel implementation of MPTCP, a module
-    interface exists for this, called the path manager.
 
   }
 \end{frame}
 
 \FigureSlide{figures/DataScheduling.pdf}{
 
-  So, now that we have subflows, what do we do with them? How do we get data
-  through them to the other application? Well, we do this with two important
-  concepts: a data scheduler and the data sequence mapping.
+  \textbf{Transition:} Now that we have subflows, how do we split up data across
+  them?
 
-  Imagine one host wants to send some data. It passes it through the send system
-  call, and eventually the MPTCP stack has a large piece of data. A component
-  called the scheduler gets to make the executive decision of how to divide up
-  the data. It does this however it pleases, and the chunks make their way down
-  to the subflows.
-
-  In order to be able to put them back together, a data sequence signal is sent
-  on the subflow.
+  \begin{itemize}
+  \item Again, MPTCP specifies mechanism but not policy
+  \item Diagram top shows sender
+  \item Data goes into scheduler, which divides it across subflows (will come
+    back to that)
+  \item To send it across the wire, MPTCP adds DSS option, which maps subflow
+    sequence number X to data sequence number Y, for Z bytes
+  \item At receiver, use options to reassemble data
+  \item Data may be redundantly transferred, can't break subflow TCP semantics
+  \item Scheduler has considerable freedom in dividing data
+  \item Lowest RTT first ... ack-clocking
+  \end{itemize}
 
 }
 
 \section{Related Work}
 \SectionHead{}{
-  Would love to discuss more, but limited time
+  \textbf{Transition:} Now in order to appreciate the place of this thesis,
+  let's examine some related work. The topic includes detour routing, overlay
+  routing, source routing, and multipath transport.
 }
 
 \subsection{Overlay Networks}
@@ -423,6 +413,8 @@
       single-homed devices due to RON}
     \end{itemize}
   \end{itemize}
+
+  \note[item]{\textbf{Remember:} \textit{No ``last piece'' of related work.}}
 \end{frame}
 
 \begin{frame}
@@ -453,11 +445,20 @@
       However this approach expects non MPTCP server, and is ``transparent''
       proxy.}
   \end{itemize}
+
+  \note[item]{\textbf{Remember:} \textit{No ``last piece'' of related work.}}
+
+  % TODO: may want to swap out some less interesting things with BitTorrent /
+  % gnutella / other peer-to-peer apps
 \end{frame}
 
 \section{Implementation}
 \SectionHead{}{
-  Time to get into the actual implementation of this project.
+
+  \textbf{Transition:} Now that we have seen work related to these
+  topics, let's discuss how I was able to implement the system described -
+  one-hop detour routing, path aggregation, and transparency to the application.
+
 }
 \subsection{Overview}
 
@@ -671,7 +672,10 @@
 \end{frame}
 
 \section{Evaluation}
-\SectionHead{}{}
+\SectionHead{}{
+  \textbf{Transition:} With that implementation in mind, we will now discuss the
+  experiments I designed to validate this system.
+}
 
 \begin{frame}
   \frametitle{Types of Experiment}
