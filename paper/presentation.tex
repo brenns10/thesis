@@ -346,10 +346,17 @@
   \item Additional addresses may be advertised using \texttt{ADD\_ADDR} at any
     time
   \item Either side may create new subflows at any time
-  \item Spec says nothing about when they should be created, left up to policy
-  \item Kernel uses modular path manager interface for this
   \end{itemize}
   \note{
+
+    \begin{itemize}
+    \item Normal 3WHS for subflow initiation
+    \item First subflow contains MP CAPABLE, exchanges key material
+    \item Subsequent subflows contain MP JOIN, plus HMAC to verify identities
+    \item Either side may passively announce the existence of an address
+    \item Spec says nothing about when they should be created, left up to policy
+    \item Kernel uses modular path manager interface for this
+    \end{itemize}
 
   }
 \end{frame}
