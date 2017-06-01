@@ -299,7 +299,7 @@ PARAMS = {
 }
 
 
-def scenario(setup_name, params_name, trials=30):
+def scenario(setup_name, params_name, trials=30, trace=False):
     params = PARAMS[params_name]()
     mn = DetourNet(params)
     iperf_cmd = SETUP[setup_name](mn)
@@ -307,7 +307,15 @@ def scenario(setup_name, params_name, trials=30):
 
     client, detour, server = mn.get('client', 'detour', 'server')
 
-    filename = '%s.%s.%s.json' % (params_name, setup_name, name)
+    fn_base = '%s.%s.%s' % (params_name, setup_name, name)
+    filename = fn_base + '.json'
+    tcpdump_fn = fn_base + '.pcap'
+    # 48 byte ethernet
+    # 20 byte ip (hope there's no options)
+    # 20 byte tcp (not including options)
+    # 40 byte maximum TCP option space
+    # = 128 bytes captured
+    server.cmd('tcpdump -U -s 128 -w %s tcp port 5201 &' % tcpdump_fn)
     server.sendCmd('iperf3 -s -J > %s' % filename)
     print(filename + ': ', end='')
 
@@ -339,6 +347,8 @@ def main():
                         help='comma separated list of setups')
     parser.add_argument('--cli', action='store_true',
                         help='start a cli with the first param and setup')
+    parser.add_argument('--trace', action='store_true',
+                        help='create tcpdump trace at server')
     parser.add_argument('--trials', '-t', type=int, default=60)
 
     args = parser.parse_args()
@@ -353,7 +363,7 @@ def main():
     else:
         for param in params:
             for setup in setups:
-                scenario(setup, param, args.trials)
+                scenario(setup, param, trials=args.trials, trace=args.trace)
 
 
 if __name__ == '__main__':
