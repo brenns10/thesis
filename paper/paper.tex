@@ -363,13 +363,13 @@ created between the two hosts once the initial one is established, using the
 are exchanged via the \texttt{MP\_CAPABLE} option, and a token is verified using
 these keys for each new subflow via the \texttt{MP\_JOIN} option.
 
-An implementation may establish a new subflow with its peer at any time
-according to local policy. Additional addresses may be explicitly advertised
-using the \ac{mptcp} option subtype \texttt{ADD\_ADDR}, and they may be removed
-via the \ac{mptcp} option subtype \texttt{REMOVE\_ADDR}. These options are not
-reliably transmitted, so they are purely informational. While either side of a
-connection may initiate a new subflow, it is expected that the client (i.e.
-active opener) initiate most subflows, due to firewalls and \ac{nat}.
+Either side of an \ac{mptcp} connection may establish a new subflow with its
+peer at any time according to local policy. However, sometimes this may not be
+possible, due to the presence of a firewall. \ac{mptcp} allows for a peer to
+advertise the existence of an address, without creating a subflow. This is
+achieved via the option \texttt{ADD\_ADDR}. Advertised addresses may be removed
+with the \texttt{REMOVE\_ADDR} option. Neither option is acknowledged, so
+delivery of the option is not guaranteed.
 
 Data has sequence numbers at both the subflow level and at the connection level.
 Each subflow has a \ac{dss} negotiated via the \ac{mptcp} option subtype
