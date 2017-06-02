@@ -426,6 +426,7 @@ manager for the Linux kernel \ac{mptcp} implementation.
 % OpenVPN?
 
 \section{Mininet}
+\label{sec:mn}
 
 In the evaluation of our mechanism, we use the Mininet \cite{mininet} framework
 to emulate a network topology and evaluate performance across the emulated
@@ -1212,10 +1213,14 @@ attempted to answer the following questions:
 
 \begin{itemize}
 \item Given a network where an alternative path with better connection
-  properties exists, can this mechanism effectively use the alternative path?
+  properties exists, can this mechanism achieve the throughput of the better
+  path?
 \item Given a network where the core is the bottleneck, rather than access
   links, can this method aggregate the throughput of alternative paths?
-\item Can this mechanism be used effectively on the wide area Internet?
+\item What overhead exists in this mechanism compared to standard TCP across the
+  default route or standard TCP across a detour?
+\item What is the difference in the performance of the NAT and VPN detours?
+\item Can this mechanism be used across the Internet at higher throughput?
 \end{itemize}
 
 We design two types of experiments to answer each of these questions. The first
@@ -1226,7 +1231,10 @@ and deployment potential on the wide area Internet.
 
 \section{Mininet Experiments}
 
-Our first set of experiments are based on the Mininet tool \cite{mininet}.
+Our first set of experiments are based on the Mininet tool \cite{mininet}. As
+discussed in Section~\ref{sec:mn}, Mininet is a software-defined networking tool
+that allows emulation of large networks on a single machine using the native
+operating system networking stack.
 
 \subsection{Fidelity Considerations}
 
@@ -1254,8 +1262,8 @@ than 5\% over the course of an experiment.
   \label{fig:topo}
 \end{figure}
 
-Our network topology is illustrated in Figure~\ref{fig:topo}. The routers
-\texttt{r1} through \texttt{r3} are Linux hosts, as described in the previous
+Our network topology is illustrated in Figure~\ref{fig:topo}. The routers,
+client, server, and detour are Linux hosts, as described in the previous
 section. They are statically configured with routes, so that the default route
 from \texttt{client} to \texttt{server} traverses Link 2. Routing is enabled,
 and all routing occurs within the kernel.
@@ -1282,11 +1290,17 @@ configurations tested.
   the access link can support more bandwidth than the default Internet path.
 \end{itemize}
 
-For each traffic control configuration, we also create two modifications.
+We chose 10Mbps links for two reasons. First, it can model a situation in which
+the connection only receives a fraction of the available bandwidth in the
+network core. Second, it keeps the total throughput of the system well under the
+limitations of our test system, ensuring accurate emulation. For each traffic
+control configuration, we also create two modifications.
 
 \begin{itemize}
 \item \textbf{Lossy.} Link 2 is configured to drop packets independently and
-  randomly with probability 0.01.
+  randomly with probability 0.01. This is within the range of packet loss rates
+  Savage \textit{et al.} observe over ``bad'' paths in their Detour study
+  \cite{detour}.
 \item \textbf{Delayed.} Link 2 is configured to have a high (100ms) latency.
 \end{itemize}
 
@@ -1306,16 +1320,18 @@ following configurations:
   default Internet routed path. The default Linux congestion control (CUBIC) is
   used.
 \item \textbf{\ac{nat} TCP.} A regular TCP flow is used, but it is directed
-  through the same \ac{nat} proxy mechanism used in the \textbf{\ac{nat}}
-  configuration.
+  through the NAT detour.
 \item \textbf{OpenVPN TCP.} A regular TCP flow is used, but it is directed
-  through the same OpenVPN proxy mechanism used in the \textbf{OpenVPN}
-  configuration.
+  through the VPN detour.
 \end{itemize}
 
 The throughput is measured with IPerf for a total of 60 trials for each
 combination of traffic control and connection configuration. A trial consists of
-a ten-second IPerf session.
+a ten-second IPerf session, which involves transferring as much data as possible
+over a TCP connection. Ten seconds is the default interval for an IPerf session.
+In our experiments, the TCP flows reached their peak throughput in under a
+second. Thus, the ten second interval is sufficient to observe the steady-state
+throughput behavior of the TCP flows.
 
 \subsection{Results}
 
