@@ -163,6 +163,9 @@
   unmodified applications.
 \end{abstract}
 
+% reset acronyms after abstract, for some reason
+\acresetall
+
 \mainmatter
 \chapter{Introduction}
 
@@ -194,8 +197,8 @@ latency. For packet loss, 80\% of the pairs had a detour path with a lower
 packet loss rate, and in nearly half, the packet loss rate improved by a factor
 of six.
 
-Overlay networks have been proposed as a way to experiment with new routing
-techniques. These techniques create a second network on top of the existing
+Overlay networks have been proposed as a way to overcome the deficiencies of
+Internet paths These techniques create a second network on top of the existing
 Internet. Peers in these overlays are connected by \textit{virtual links}, which
 are simply routes in the underlying Internet. Packets are tunneled from peer to
 peer until reaching their end destination. Overlay networks like these have been
@@ -209,7 +212,7 @@ have been increasing. While conventional wisdom has been that access links are
 usually the bottleneck, this is not always the case \cite{akella2003empirical}.
 While they have increased, studies have shown that residential link bandwidths
 are not fully utilized, especially fiber connections \cite{fibertothehome}.
-There are many reasons why this is this is the case. For one, short-lived TCP
+There are many reasons why this is the case. For one, short-lived TCP
 connections may never leave the slow start phase. For another, TCP initial
 window settings may not be high enough to accommodate faster links. However,
 sometimes the default Internet route may not be able to accommodate these higher
@@ -238,9 +241,12 @@ applications may use this mechanism simply by using our patched kernel.
 
 The contributions of this thesis are as follows:
 \begin{itemize}
-\item A system of Linux kernel modifications and user-space tools that allow
-  alternative routes to be added to \ac{mptcp} connections.
-\item An evaluation of the method on emulated and real world networks.
+\item We propose a method for leveraging detour routing in a way that is
+  transparent to the application, by using \ac{mptcp} on a single-homed host.
+\item We present a prototype implementation of this method based on a system of
+  Linux kernel modifications and user-space tools.
+\item We evaluate this mechanism on emulated network topologies and on the
+  Internet.
 \end{itemize}
 
 The remainder of this thesis will follow the following structure. Background
@@ -269,11 +275,11 @@ example of these devices is the smartphone, which typically comes with at least
 two network interfaces: one for cellular data, and one for Wi-Fi. While these
 devices have become more common, protocols have not kept up. Most Internet
 traffic is carried on TCP, which identifies a data stream by the 5-tuple of
-protocol, source address and port, and destination address and port. As a
-result, multi-homed devices are forced to choose only one interface for a TCP
-session \cite{raiciu2012hard}. \ac{mptcp} was designed as a protocol extension
-to TCP, which allows multiple interfaces (and as a result, network paths) to be
-used in the same TCP stream.
+protocol, source address, source port number, destination address, and
+destination port number. As a result, multi-homed devices are forced to choose
+only one interface for a TCP session \cite{raiciu2012hard}. \ac{mptcp} was
+designed as a protocol extension to TCP, which allows multiple interfaces (and
+as a result, network paths) to be used in the same TCP stream.
 
 \subsection{Design Considerations}
 
@@ -282,24 +288,24 @@ level, it aims to use the existence of multiple paths to improve efficiency and
 resiliency of standard TCP. Other transport protocols support this, such as SCTP
 with Concurrent Multipath Transfer \cite{iyengar2006concurrent}. However, SCTP
 cannot easily be used as a replacement for TCP, because applications would
-require modification, and some NATs and firewalls do not support SCTP
-\cite{barre2011multipath}. As a result, \ac{mptcp} also aims to be compatible
+require modification, and some \acp{nat} and firewalls do not support SCTP
+\cite{barre2011multipath}. In contrast, \ac{mptcp} also aims to be compatible
 with the Internet today, so it can be deployed widely.
 
 \ac{mptcp}'s design focuses on two types of compatibility, which motivate many
 of its high-level design decisions. First, application compatibility: \ac{mptcp}
 must be usable by existing TCP applications without modification. Second,
 network compatibility: \ac{mptcp} must be usable across the Internet today,
-including across features of the modern Internet such as NAT, firewalls, traffic
-normalizers, and performance-enhancing proxies (collectively referred to as
-middleboxes). In the design of \ac{mptcp}, consideration is made for the
+including across features of the modern Internet such as \acp{nat}, firewalls,
+traffic normalizers, and performance-enhancing proxies (collectively referred to
+as middleboxes). In the design of \ac{mptcp}, consideration is made for the
 following types of disruption by middleboxes \cite{rfc6182}:
 
 \begin{itemize}
-\item Home routers often perform NAT, and so addresses may not be the same on
-  either side of a connection.
-\item Some NAT boxes will additionally rewrite content of some protocols, such
-  as URLs in HTTP \cite{rfc6182} and IP addresses and ports in FTP
+\item Home routers often perform \ac{nat}, and so addresses may not be the same
+  on either side of a connection.
+\item Some \ac{nat} boxes will additionally rewrite content of some protocols,
+  such as URLs in HTTP \cite{rfc6182} and IP addresses and ports in FTP
   \cite{raiciu2012hard}.
 \item Some middleboxes perform sequence number randomization.
 \item Some middleboxes strip unrecognized options from packets.
@@ -318,7 +324,7 @@ using more resources than a single TCP flow would across a shared bottleneck
 
 These combined architectural guidelines not only make \ac{mptcp} suitable for
 deployment, but they also make it more resilient to the mechanisms used in this
-thesis (such as NAT) to extend it in new ways.
+thesis (such as \ac{nat}) to extend it in new ways.
 
 \subsection{Architecture}
 
@@ -363,7 +369,7 @@ using the \ac{mptcp} option subtype \texttt{ADD\_ADDR}, and they may be removed
 via the \ac{mptcp} option subtype \texttt{REMOVE\_ADDR}. These options are not
 reliably transmitted, so they are purely informational. While either side of a
 connection may initiate a new subflow, it is expected that the client (i.e.
-active opener) initiate most subflows, due to firewalls and NAT.
+active opener) initiate most subflows, due to firewalls and \ac{nat}.
 
 Data has sequence numbers at both the subflow level and at the connection level.
 Each subflow has a \ac{dss} negotiated via the \ac{mptcp} option subtype
@@ -799,11 +805,11 @@ its own /24 subnet, there would be capacity for 65,536 non-conflicting subnets.
 However, in our testing, subnets were manually allocated to avoid conflicts.
 
 Finally, in order to forward VPN traffic to the internet, the detour must be
-configured (via Netfilter) to perform network address translation (NAT) on
+configured (via Netfilter) to perform network address translation (\ac{nat}) on
 outgoing packets. This process is typical for a home router and for VPNs which
 provide Internet access. As discussed earlier, \ac{mptcp} is designed with this
-behavior in mind, and so it is capable of functioning through NAT, so long as
-the middleboxes do not remove TCP options in transit, or modify data contents
+behavior in mind, and so it is capable of functioning through \ac{nat}, so long
+as the middleboxes do not remove TCP options in transit, or modify data contents
 \cite{rfc6182}.
 
 The OpenVPN implementation has several attractive qualities. First, it relies on
@@ -829,42 +835,43 @@ tunnels from a detour.
 \begin{figure}
   \centering
   \includegraphics[height=0.3\textheight]{figures/NATTypes.pdf}
-  \caption[Types of NAT provided by Netfilter]{Types of NAT provided by
-    Netfilter. \textbf{Top:} SNAT only. \textbf{Middle:} DNAT only.
+  \caption[Types of \ac{nat} provided by Netfilter]{Types of \ac{nat} provided
+    by Netfilter. \textbf{Top:} SNAT only. \textbf{Middle:} DNAT only.
     \textbf{Bottom:} Both SNAT and DNAT, as used in the NAT tunnel.}
   \label{fig:NATTypes}
 \end{figure}
 
-The Linux kernel's Netfilter framework allows for two types of NAT, illustrated
-in Figure~\ref{fig:NATTypes} \cite{russell2002nat}. The first kind, source NAT
-(SNAT), rewrites the source address of the packet. This is the typical form of
-NAT used by home routers: the source address of an outgoing connection is
-rewritten to be the router's external IP address, but the destination is
-unchanged. This type of rule is applied after routing has taken place. The
-second kind of NAT supported by Netfilter is destination NAT (or DNAT) which
-rewrites the destination of the packet. This rule is applied before routing, so
-that a proper interface can be selected for the new address.
+The Linux kernel's Netfilter framework allows for two types of \ac{nat},
+illustrated in Figure~\ref{fig:NATTypes} \cite{russell2002nat}. The first kind,
+source \ac{nat} (SNAT), rewrites the source address of the packet. This is the
+typical form of \ac{nat} used by home routers: the source address of an outgoing
+connection is rewritten to be the router's external IP address, but the
+destination is unchanged. This type of rule is applied after routing has taken
+place. The second kind of \ac{nat} supported by Netfilter is destination
+\ac{nat} (or DNAT) which rewrites the destination of the packet. This rule is
+applied before routing, so that a proper interface can be selected for the new
+address.
 
-The detour takes advantage of both forms of NAT offered by the kernel. First, it
-applies DNAT, setting the destination address to be the final server's IP
-address (signaled ahead of time). Then, it applies SNAT, setting the source
+The detour takes advantage of both forms of \ac{nat} offered by the kernel.
+First, it applies DNAT, setting the destination address to be the final server's
+IP address (signaled ahead of time). Then, it applies SNAT, setting the source
 address to be its own external IP. The Netfilter framework remembers these
 connections so that reply packets are properly forwarded back to the client.
 
-Thanks to Netfilter, this NAT mapping can be arranged with two \texttt{iptables}
-commands, with no custom kernel or user-space code required for packet
-forwarding. It is possible to implement this in userspace using Netfilter-Queue
-and a user-space application, but this approach has several drawbacks. It would
-have to be single-threaded, and it would require that packet data be copied from
-kernel space into user space and back. More critically, the connection tracking
-provided by the kernel is more robust than what would be implemented by user
-space.
+Thanks to Netfilter, this \ac{nat} mapping can be arranged with two
+\texttt{iptables} commands, with no custom kernel or user-space code required
+for packet forwarding. It is possible to implement this in userspace using
+Netfilter-Queue and a user-space application, but this approach has several
+drawbacks. It would have to be single-threaded, and it would require that packet
+data be copied from kernel space into user space and back. More critically, the
+connection tracking provided by the kernel is more robust than what would be
+implemented by user space.
 
 As mentioned earlier, the server address must be communicated to the detour
 ahead of time in order to use this scheme. To that end, we have designed a
-simple UDP-based protocol for clients to request NAT mappings from a detour. The
-detour listens for requests on UDP port 45672. The request format is shown
-in Figure~\ref{fig:udp-nat-packet}.
+simple UDP-based protocol for clients to request \ac{nat} mappings from a
+detour. The detour listens for requests on UDP port 45672. The request format is
+shown in Figure~\ref{fig:udp-nat-packet}.
 
 \begin{figure}
   \centering
@@ -877,7 +884,7 @@ in Figure~\ref{fig:udp-nat-packet}.
 | rpt (2 bytes)   | dpt (2 bytes)   |
 +-----------------|-----------------+
 \end{BVerbatim}
-  \caption{UDP NAT tunnel request structure}
+  \caption{UDP \ac{nat} tunnel request structure}
   \label{fig:udp-nat-packet}
 \end{figure}
 
@@ -918,7 +925,7 @@ for several reasons:
 \end{itemize}
 
 In order to create the tunnels, the detour runs two IPTables commands, which
-create NAT rules. The first performs DNAT:
+create \ac{nat} rules. The first performs DNAT:
 
 \begin{lstlisting}
 iptables -t nat -A PREROUTING \
@@ -964,9 +971,9 @@ packet. Since no headers are added, the full amount of data may be transmitted
 on these segments. However, its disadvantage is that tunnels must be configured
 each time a new connection is created on the client. In the case of OpenVPN, a
 new subflow may routed through an existing OpenVPN connection without any
-additional communication with the detour. However, with the NAT approach, each
-time a subflow is initiated with a new server, a tunnel must first be negotiated
-with the detour server.
+additional communication with the detour. However, with the \ac{nat} approach,
+each time a subflow is initiated with a new server, a tunnel must first be
+negotiated with the detour server.
 
 \section{Path Manager}
 
@@ -1010,19 +1017,19 @@ interface (described in Section~\ref{s:genl}), requesting a detour. Then, it
 looks through an internal list of detours. The kernel maintains two lists of
 detours (per network namespace). The first is a list of OpenVPN detours. These
 detour entries are not specific to a server, and they simply indicate the name
-of a network interface to use. The second list contains NAT detours. These
+of a network interface to use. The second list contains \ac{nat} detours. These
 consist of a detour address and port, and a server address and port. The worker
-may only select NAT entries which match the destination address and port of the
-connection it is working on.
+may only select \ac{nat} entries which match the destination address and port of
+the connection it is working on.
 
 The task attempts to add up to $N$ subflows, where $N$ is a configurable limit.
 It terminates in one of two ways. Either it has exhaused all of the available
 detours, but not yet created all $N$ subflows. Otherwise, if it creates $N$
 subflows successfully, it stops looking through the list, even if more detours
 are available. If OpenVPN detours are available, then they take precedence over
-the NAT detours, because they are available immediately. NAT detours created by
-the client daemon become available only once the daemon has processed the
-request from the kernel.
+the \ac{nat} detours, because they are available immediately. \ac{nat} detours
+created by the client daemon become available only once the daemon has processed
+the request from the kernel.
 
 \subsection{Generic Netlink}
 \label{s:genl}
@@ -1058,10 +1065,10 @@ implemented:
   multicast group, which the client daemon subscribes to. Specifies a remote
   address and port which the kernel would like to create a detour to.
 \item \texttt{DETOUR\_C\_ADD}: A command sent from userspace to the kernel. Adds
-  a detour (of type NAT or VPN) to the kernel's internal list of detours. When a
-  new, unique detour is received, this command looks through each connection in
-  the current network namespace and wakes its worker, so it may consider using
-  the detour.
+  a detour (of type \ac{nat} or VPN) to the kernel's internal list of detours.
+  When a new, unique detour is received, this command looks through each
+  connection in the current network namespace and wakes its worker, so it may
+  consider using the detour.
 \item \texttt{DETOUR\_C\_DEL}: A command sent from userspace to the kernel.
   Removes a detour from the kernel's internal list.
 \item \texttt{DETOUR\_C\_ECHO}: A command sent from userspace to the kernel,
@@ -1078,7 +1085,7 @@ receive requests from its own namespace.
 
 The client daemon has two main responsibilities. First, it must create OpenVPN
 connections and report them to the kernel. Second, it must respond to detour
-requests from the kernel by creating NAT detours and reporting them back.
+requests from the kernel by creating \ac{nat} detours and reporting them back.
 
 The daemon has a configuration file which allows the user to specify the IP
 addresses of hosts to use for both types of detours. On startup, the daemon
@@ -1086,14 +1093,16 @@ executes the OpenVPN client software, and waits for it to fully initialize. A
 new thread is used to monitor the OpenVPN client process, logging any important
 messages.
 
-Next the daemon creates a UDP socket corresponding to each NAT detour in its
-configuration file. A separate thread is launched, which calls \texttt{select()}
-on the set of detour sockets, waiting for incoming responses from any detour.
+Next the daemon creates a UDP socket corresponding to each \ac{nat} detour in
+its configuration file. A separate thread is launched, which calls
+\texttt{select()} on the set of detour sockets, waiting for incoming responses
+from any detour.
 
 Finally, the detour creates a Netlink socket, subscribes to the path manager's
 multicast group, and begins waiting for requests. For each request, it sends a
-UDP request to every NAT detour. When the receiving thread receives a response,
-it sends the final data over the Netlink socket back to the path manager.
+UDP request to every \ac{nat} detour. When the receiving thread receives a
+response, it sends the final data over the Netlink socket back to the path
+manager.
 
 \section{Security Considerations}
 
@@ -1217,15 +1226,16 @@ following configurations:
 \begin{itemize}
 \item \textbf{1-Subflow.} MPTCP is enabled, but no detours are configured on the
   client. The connection uses only one subflow, across the Internet routed path.
-\item \textbf{NAT.} In addition to a subflow on the Internet routed path, a
-  second subflow is through a NAT detour.
+\item \textbf{\ac{nat}.} In addition to a subflow on the Internet routed path, a
+  second subflow is through a \ac{nat} detour.
 \item \textbf{OpenVPN.} In addition to a subflow on the Internet routed path, a
   second subflow is through a OpenVPN detour.
 \item \textbf{TCP.} MPTCP is disabled. A regular TCP flow is used, across the
   default Internet routed path. The default Linux congestion control (CUBIC) is
   used.
-\item \textbf{NAT TCP.} A regular TCP flow is used, but it is directed through
-  the same NAT proxy mechanism used in the \textbf{NAT} configuration.
+\item \textbf{\ac{nat} TCP.} A regular TCP flow is used, but it is directed
+  through the same \ac{nat} proxy mechanism used in the \textbf{\ac{nat}}
+  configuration.
 \item \textbf{OpenVPN TCP.} A regular TCP flow is used, but it is directed
   through the same OpenVPN proxy mechanism used in the \textbf{OpenVPN}
   configuration.
@@ -1249,9 +1259,9 @@ Symmetric network without loss or latency. In this comparison, we can see three
 important conclusions. First, splitting the traffic across two paths when the
 bottleneck is shared results in more overhead and lower throughput. Second,
 \ac{mptcp} with a single subflow shows more variable throughput behavior than
-regular TCP. Third, regular TCP over the NAT detour demonstrates slightly higher
-throughput than regular TCP over the VPN, although the difference is small (0.5
-Mbps).
+regular TCP. Third, regular TCP over the \ac{nat} detour demonstrates slightly
+higher throughput than regular TCP over the VPN, although the difference is
+small (0.5 Mbps).
 
 \begin{figure}
   \centering
@@ -1260,10 +1270,10 @@ Mbps).
   \label{fig:sym_lossy}
 \end{figure}
 
-In Figure~\ref{fig:sym_lossy}, we see the effect of adding a 1\% loss rate to
-a link that is present only on the default path. Regular TCP and \ac{mptcp} with
+In Figure~\ref{fig:sym_lossy}, we see the effect of adding a 1\% loss rate to a
+link that is present only on the default path. Regular TCP and \ac{mptcp} with
 one subflow show significant losses in throughput, although \ac{mptcp} is much
-worse. When NAT or VPN paths are added to the \ac{mptcp} connection, the
+worse. When \ac{nat} or VPN paths are added to the \ac{mptcp} connection, the
 performance is comparable to regular TCP traveling solely across those paths,
 but no better.
 
@@ -1310,11 +1320,11 @@ The results for the core-limited network are much different.
 Figure~\ref{fig:easy} shows a comparison of throughput on the core-limited
 network, with no loss or latency. Since the detour path traverses different core
 links than the default path, there is no competition. Thus there is the
-potential to aggregate the capacity of both paths. Both the NAT and VPN methods
-are able to aggregate nearly all of the capacity, although the NAT performs very
-slightly better.
+potential to aggregate the capacity of both paths. Both the \ac{nat} and VPN
+methods are able to aggregate nearly all of the capacity, although the \ac{nat}
+performs very slightly better.
 
-When loss is introduced, Figure~\ref{fig:lossy} shows that the NAT and VPN
+When loss is introduced, Figure~\ref{fig:lossy} shows that the \ac{nat} and VPN
 methods outperform their pure TCP variants, since they are able to aggregate the
 throughput of both paths. Even though the default path is lossy, it is able to
 contribute some throughput to the \ac{mptcp} connection.
@@ -1331,8 +1341,8 @@ When the network has potential for aggregation, the mechanism is capable if
 aggregating nearly all of the available throughput. This results in better
 performance than a single flow across any available path.
 
-Across all the connections, the NAT approach performs slightly better than the
-VPN, likely due to the additional overhead of the IP and UDP encapsulation,
+Across all the connections, the \ac{nat} approach performs slightly better than
+the VPN, likely due to the additional overhead of the IP and UDP encapsulation,
 along with any OpenVPN protocol overhead.
 
 \section{AWS Experiment}
@@ -1349,7 +1359,7 @@ three instances, each in a different region. The client is located in the
 \texttt{us-west-1} region (Northern California), the detour in
 \texttt{us-east-2} (Ohio), and the server in \texttt{us-east-1} (Northern
 Virginia). We then ran the IPerf 3 tool for 100 trials in each of the following
-configurations: \textbf{1-Subflow}, \textbf{NAT}, and \textbf{OpenVPN}.
+configurations: \textbf{1-Subflow}, \textbf{\ac{nat}}, and \textbf{OpenVPN}.
 
 \begin{figure}
   \centering
@@ -1365,10 +1375,10 @@ functioning on the wide-area Internet, at higher transmission rates than we
 emulated in the Mininet experiments.
 
 Another interesting result of this experiment is that the OpenVPN mechanism,
-which performed slightly worse than the NAT mechanism in our Mininet tests,
-slightly outperforms the NAT mechanism. Due to the wide variability in the data,
-it is not clear whether this result is due to noise or due to an underlying
-aspect of the mechanism.
+which performed slightly worse than the \ac{nat} mechanism in our Mininet tests,
+slightly outperforms the \ac{nat} mechanism. Due to the wide variability in the
+data, it is not clear whether this result is due to noise or due to an
+underlying aspect of the mechanism.
 
 \chapter{Future Work}
 \label{c:fw}
@@ -1443,11 +1453,11 @@ wasteful strategy, such as the default Lowest RTT First scheduler.
 
 \section{IP Options}
 
-Currently, the NAT forwarding mechanism uses a UDP-based protocol for requesting
-tunnels. As a result, there is a one RTT overhead before each NAT detour may be
-established. However, the NAT tunnel has lower overhead than the VPN method, and
-thus performs measurably better. Removing the one RTT delay could make the NAT
-method the best overall choice.
+Currently, the \ac{nat} forwarding mechanism uses a UDP-based protocol for
+requesting tunnels. As a result, there is a one RTT overhead before each
+\ac{nat} detour may be established. However, the \ac{nat} tunnel has lower
+overhead than the VPN method, and thus performs measurably better. Removing the
+one RTT delay could make the \ac{nat} method the best overall choice.
 
 It may be possible to embed the final destination of the initial \texttt{SYN}
 packet into an IP option. This would eliminate the need for a signaling
@@ -1463,8 +1473,8 @@ path manager in the 0.91 version of the Multipath TCP Linux kernel, along with
 several user-space utilities which complete the system.
 
 The implementation is structured so that two different mechanisms for tunneling
-subflows are allowed. We have seen that the NAT approach has slightly better
-performance due to its lower per-packet overhead. However, that increased
+subflows are allowed. We have seen that the \ac{nat} approach has slightly
+better performance due to its lower per-packet overhead. However, that increased
 performance comes at the expense of an extra RTT for setting up a tunnel, and
 the extra complexity of a dynamic client which creates them. The VPN approach is
 simpler, but has higher overhead.
