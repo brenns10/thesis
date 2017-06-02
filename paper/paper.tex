@@ -412,7 +412,7 @@ alternative addresses, the Linux implementation uses another modular component
 called a ``path manager'' \cite{mptcp}. The default implementation does nothing
 (except accepting incoming connections). The Linux implementation also includes
 an \texttt{ndiffports} path manager, which initiates up to $N$ subflows with a
-server, from different source ports. This path manager can be useful for
+server, from different TCP source ports. This path manager can be useful for
 \ac{ecmp}, which will be discussed shortly. A \texttt{fullmesh} path manager
 establishes subflows between every pair of client addresses and advertised
 server addresses. A major part of the implementation of this thesis is a path
@@ -519,7 +519,7 @@ take. In IPv4, these mechanisms are the options \ac{lsrr} and \ac{ssrr}
 partial (Loose) or complete (Strict) route consisting of a list of addresses. In
 IPv6, a similar mechanism called Segment Routing is being proposed by the IPv6
 Maintenance Working Group of the IETF \cite{draft-segment-routing}. Options like
-these are most useful within a single managed system, since they are not
+these are most useful within a single managed network, since they are not
 respected on the wide area Internet, due to the potential for spoofing IP
 addresses while still receiving reply packets.
 
@@ -596,19 +596,21 @@ created which do so (see Section~\ref{s:rw-transport}).
 
 \subsection{Equal Cost Multi-path Routing}
 
-The \ac{mptcp} protocol specification specifically allows for subflows to be
-established from the same client address, to the same server address, with
-simply a different source port \cite{rfc6824}. One reason this is allowed is to
-enable path diversity via \ac{ecmp}. In large data center networks, highly
+The \ac{mptcp} protocol specification allows for subflows to be established
+between the same two IP addresses as a pre-existing subflow in a connection,
+using a different TCP source port \cite{rfc6824}. One reason this is allowed is
+to enable path diversity via \acf{ecmp}. In large data center networks, highly
 redundant network topologies have been deployed, so that there are several
-routes between hosts. Such routing topologies use \ac{ecmp} to choose between
-paths that have the same cost, by using a hash of the connection 5-tuple
-\cite{raiciu2011improving}. In \cite{raiciu2011improving}, Raiciu \textit{et
-  al.} describe in detail a simulation study that evaluates the performance of
-\ac{mptcp} on several data center topologies and congestion controls. They also
-describe a validation on an Amazon EC2 data center with a highly redundant
-topology, in which using \ac{mptcp} with four subflows achieved a 3x throughput
-improvement.
+routes between hosts. Routers in these topologies use \ac{ecmp} to choose
+between paths that have the same cost, by hashing the connection 5-tuple
+\cite{raiciu2011improving}. While normally, \ac{ecmp} provides load-balancing,
+it can be combined with \ac{mptcp} to provide bandwidth aggregation, since a
+subflow's different 5-tuple may result in a different route. In
+\cite{raiciu2011improving}, Raiciu \textit{et al.} describe in detail a
+simulation study that evaluates the performance of \ac{mptcp} on several data
+center topologies and congestion controls. They also describe a validation on an
+Amazon EC2 data center with a highly redundant topology, in which using
+\ac{mptcp} with four subflows achieved a 3x throughput improvement.
 
 \subsection{Binder}
 
@@ -619,19 +621,21 @@ low-bandwidth gateways. Rather than use one gateway primarily and others as
 backup, Binder allows aggregation of all of the gateways.
 
 This is achieved by routing all outgoing traffic through an OpenVPN connection.
-The OpenVPN connection uses \ac{mptcp}. One subflow is dedicated to each gateway
-(using IP source routing options). The OpenVPN server, located outside of the
-local network, terminates the \ac{mptcp} connection and performs \ac{nat},
-routing all packets to their final destinations.
+Binder leverages the capability of OpenVPN to run over \ac{mptcp}. One subflow
+is dedicated to each gateway (using IP source routing options). The OpenVPN
+server, located outside of the local network, terminates the \ac{mptcp}
+connection and performs \ac{nat}, routing all packets to their final
+destinations.
 
 We consider this to be a network layer mechanism since it forwards IP datagrams
 over the OpenVPN connection. As pointed out in their paper, Binder strikingly
 parallels channel-bonding techniques such as the ones described in
 Section~\ref{s:rw-ll}.
 
-Our mechanism also uses OpenVPN, but a key differentiation is that while Binder
-uses OpenVPN over \ac{mptcp}, we only put a single subflow of an \ac{mptcp}
-connection through OpenVPN.
+Our mechanism also uses OpenVPN, as one of the two implementation alternatives
+for the detour. However, a key difference is that while Binder uses OpenVPN over
+\ac{mptcp}, we only put a single subflow of an \ac{mptcp} connection through
+OpenVPN, essentially leveraging OpenVPN for tunneling.
 
 \section{Transport Layer}
 \label{s:rw-transport}
@@ -648,19 +652,23 @@ However, one prior transport-layer approach is very relevant. In
 mTCP, an early multipath variation of TCP. Rather than using a TCP connection
 per-subflow, mTCP simply routes TCP segments across different paths. Congestion
 control is performed separately on each ``subflow'', while the receive window is
-global. Acknowledgements are transmitted on only one return path.
-
-Paths are dynamically added based on a heuristic that involves an estimated path
+global. Acknowledgements are transmitted on only one return path. Paths are
+dynamically added based on a heuristic that involves an estimated path
 disjointness metric based on traceroute and latency. Paths are suppressed when
 shared congestion is detected, and removed if they are detected to have failed.
 
 The mTCP mechanism is based on a user-space TCP implementation, and it uses
-\ac{ron} \cite{ron} as the network-layer which provides multiple routes. As a
-result, the mechanism is not directly deployable on the Internet, nor could it
-be easily made compatible with existing applications. In the years since mTCP
-was designed, \ac{mptcp} was designed and overlay networks have become less
-common. We view this thesis as a modern, compatible, and deployable take on the
-concepts in mTCP.
+\ac{ron} \cite{ron} as a network layer capable of providing multiple routes. By
+using \ac{ron}, single-homed devices are just as capable of using mTCP for
+bandwidth aggregation as multi-homed devices. However, due to the nature of mTCP
+as a fully user-space library, the mechanism cannot be made compatible with
+unmodified applications. Additionally, its design choices contradict many of the
+network compatibility considerations made in the design of \ac{mptcp}. In the
+years since mTCP was designed, \ac{mptcp} has been standardized, with the
+benefits of improved network and application compatibility. We view this thesis
+as a more compatible and standards-based take on the concepts of mTCP. Our
+mechanism has the benefit of transparency to the application, and no dependence
+on \ac{ron}.
 
 \section{Application Layer}
 
@@ -686,8 +694,15 @@ routed through the ISP, to an \ac{mcp}. The \ac{mcp} establishes a \ac{mptcp}
 connection to another \ac{mcp}, which will then connect to the final destination
 over TCP.
 
-These mechanisms are at the application layer, because they terminate TCP and
-\ac{mptcp} connections, acting as proxies.
+There is some overlap in the goals of this IETF proxy mechanism, when compared
+to our detouring mechanism. Both aim to bring the benefits of \ac{mptcp} to
+devices which otherwise may not be able to use them. The proxy mechanism focuses
+on servers, and possibly clients, which do not support \ac{mptcp}. Our detouring
+mechanism instead focuses on single-homed devices which support \ac{mptcp}, but
+have no additional addresses to create new paths along. These approaches are not
+mutually exclusive. In fact, the one \ac{mcp} scenario could be used in
+conjunction with our mechanism to allow single-homed devices to gain the
+benefits of multiple paths, even when a server does not support \ac{mptcp}.
 
 \chapter{Implementation}
 \label{c:impl}
