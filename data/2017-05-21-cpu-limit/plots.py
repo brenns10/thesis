@@ -42,7 +42,7 @@ def make_single_plot(base):
 
     fig, ax = plt.subplots()
     print(list(map(len, data)))
-    ax.boxplot(data, 0, '', labels=labels)
+    ax.boxplot(data, labels=labels)
     ax.set_ylabel('Throughput (Mbps)')
     ax.set_title('Throughput Comparison: ' + META[base])
     fig.savefig('%s.pdf' % base.replace('.', '-').replace('_', '-'))
