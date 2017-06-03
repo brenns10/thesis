@@ -315,7 +315,8 @@ def scenario(setup_name, params_name, trials=30, trace=False):
     # 20 byte tcp (not including options)
     # 40 byte maximum TCP option space
     # = 128 bytes captured
-    server.cmd('tcpdump -U -s 128 -w %s tcp port 5201 &' % tcpdump_fn)
+    if trace:
+        server.cmd('tcpdump -U -s 128 -w %s tcp port 5201 &' % tcpdump_fn)
     server.sendCmd('iperf3 -s -J > %s' % filename)
     print(filename + ': ', end='')
 
