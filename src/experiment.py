@@ -237,24 +237,35 @@ def params_easy():
     return BASIC_PARAMS.copy()
 
 
-def params_lossy():
+def params_loss_rate(rate):
     """
     This scenario is similar to 'easy', but there is loss along the default
     route.
     """
-    d = BASIC_PARAMS.copy()
-    d['r1_r2']['loss'] = 1
-    return d
+    def inner():
+        d = BASIC_PARAMS.copy()
+        d['r1_r2']['loss'] = rate
+        return d
+    return inner
 
 
-def params_delayed():
+def params_lossy():
+    params_loss_rate(1)()
+
+
+def params_delay_ms(ms):
     """
     This scenario is similar to 'easy', but there is a high latency link across
     the default route.
     """
-    d = BASIC_PARAMS.copy()
-    d['r1_r2']['delay'] = '100ms'
-    return d
+    def inner():
+        d = BASIC_PARAMS.copy()
+        d['r1_r2']['delay'] = str(ms) + 'ms'
+        return d
+    return inner
+
+def params_delayed():
+    params_delay_ms(100)()
 
 
 def params_sym():
@@ -269,33 +280,47 @@ def params_sym():
     return d
 
 
-def params_sym_lossy():
+def params_sym_loss_rate(rate):
     """
     This scenario, based on symmetric, has each link with the same bandwidth.
     However, the default route is lossy. Thus, the two flows are competing for
     bandwidth and the alternative subflow needs to make up the total bandwidth.
     """
-    d = params_sym()
-    d['r1_r2']['loss'] = 1
-    return d
+    def inner():
+        d = params_sym()
+        d['r1_r2']['loss'] = rate
+        return d
+    return inner
 
 
-def params_sym_delayed():
+def params_sym_delay_ms(ms):
     """
     This scenario is based on symmetric, but the default route has high delay.
     """
-    d = params_sym()
-    d['r1_r2']['delay'] = '100ms'
-    return d
+    def inner():
+        d = params_sym()
+        d['r1_r2']['delay'] = str(ms) + 'ms'
+        return d
+    return inner
 
 
 PARAMS = {
     'easy': params_easy,
-    'lossy': params_lossy,
-    'delayed': params_delayed,
+    'lossy05': params_loss_rate(0.5),
+    'lossy': params_loss_rate(1),
+    'lossy2': params_loss_rate(2),
+    'lossy5': params_loss_rate(5),
+    'delayed20': params_delay_ms(20),
+    'delayed50': params_delay_ms(50),
+    'delayed': params_delay_ms(100),
     'sym': params_sym,
-    'sym_lossy': params_sym_lossy,
-    'sym_delayed': params_sym_delayed,
+    'sym_lossy05': params_sym_loss_rate(0.5),
+    'sym_lossy': params_sym_loss_rate(1),
+    'sym_lossy2': params_sym_loss_rate(2),
+    'sym_lossy5': params_sym_loss_rate(5),
+    'sym_delayed20': params_sym_delay_ms(20),
+    'sym_delayed50': params_sym_delay_ms(50),
+    'sym_delayed': params_sym_delay_ms(100),
 }
 
 
