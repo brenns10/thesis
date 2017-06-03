@@ -1325,13 +1325,18 @@ following configurations:
   through the VPN detour.
 \end{itemize}
 
-The throughput is measured with IPerf for a total of 60 trials for each
-combination of traffic control and connection configuration. A trial consists of
-a ten-second IPerf session, which involves transferring as much data as possible
-over a TCP connection. Ten seconds is the default interval for an IPerf session.
-In our experiments, the TCP flows reached their peak throughput in under a
-second. Thus, the ten second interval is sufficient to observe the steady-state
-throughput behavior of the TCP flows.
+Throughput is measured with a 10 second IPerf session, which involves
+transmitting as much data as possible over a TCP (or \ac{mptcp}) connection. 10
+seconds is the default interval for an IPerf session. In our experiments, the
+TCP flows reached their peak throughput within less than a second. Since
+\ac{mptcp} has a slower mechanism for closing a connection than standard TCP,
+\ac{mptcp} IPerf sessions lasted a few seconds longer than the TCP sessions.
+During these final time intervals, the data throughput slowed down
+significantly, contributing significant variation to our results. In order to
+control for these factors, we filter out the first second and any time intervals
+after 10 seconds. Thus, for each trial, we measure the throughput as the number
+of bytes transmitted during these 9 seconds, divided by 9 seconds. We ran 60
+trials for each combination of parameters.
 
 \subsection{Results}
 
