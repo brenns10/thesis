@@ -45,7 +45,7 @@ def make_single_plot(base):
     ax.boxplot(data, 0, '', labels=labels)
     ax.set_ylabel('Throughput (Mbps)')
     ax.set_title('Throughput Comparison: ' + META[base])
-    fig.savefig('%s.pdf' % base)
+    fig.savefig('%s.pdf' % base.replace('.', '-').replace('_', '-'))
 
 
 def make_all_plots():
@@ -68,7 +68,7 @@ def make_time_series_grid(base):
     axarr[1][0].set_xlabel('Control')
     axarr[1][1].set_xlabel('NAT')
     axarr[1][2].set_xlabel('VPN')
-    fig.savefig('timegrid.%s.pdf' % base)
+    fig.savefig('timegrid-%s.pdf' % base.replace('.', '-').replace('_', '-'))
 
 
 def make_all_time_series_grid():

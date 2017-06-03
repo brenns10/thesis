@@ -28,9 +28,20 @@ def json_parse(filename):
 def objects_to_bps(obj_list):
     """Converts a sequence of JSON objects to the bits per second."""
     for obj in obj_list:
-        bps = obj.get('end', {}).get('sum_received', {}).get('bits_per_second')
-        if bps:
-            yield bps
+        if 'error' in obj.keys():
+            return
+        # First, filter out the intervals that are after 1 second (slow start)
+        # and before the 10 second mark (when the connection winds down).
+        # Then compute bits per second and return it.
+        intervals = []
+        for interval in obj['intervals']:
+            if interval['sum']['start'] >= 0.9 and interval['sum']['end'] <= 10.1:
+                intervals.append(interval)
+
+        seconds = intervals[-1]['sum']['end'] - intervals[0]['sum']['start']
+        bytes_ = sum(x['sum']['bytes'] for x in intervals)
+
+        yield bytes_ * 8 / seconds
 
 
 def objects_to_utilization(obj_list):
