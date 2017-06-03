@@ -174,59 +174,67 @@
 \chapter{Introduction}
 
 This thesis proposes a mechanism for exploring and adding alternative paths to a
-\ac{mptcp} connection, for the purpose of improving application throughput.
-These alternative paths travel through ``detour'' hosts, ensuring that the paths
-are distinct from the Internet routed path. The bandwidth of these paths can be
-aggregated, allowing better throughput than any of the constituent paths.
+\ac{mptcp} connection, for the purpose of improving application throughput and
+reliability. These alternative paths travel through ``detour'' hosts, ensuring
+that the paths are distinct from the Internet routed path. The bandwidth of
+these paths can be aggregated, allowing better throughput than any of the
+constituent paths. The implementation allows this system to be entirely
+transparent to applications.
 
 \section{Internet Routing Inefficiencies}
 
-The Internet is made up of several \acp{as}, each containing many routers.
-Routers forward packets along their outgoing interfaces according to an internal
-routing table. This table is populated with routes learned from the external
-\ac{bgp}, as well as intra-\acs{as} protocols such as \ac{ospf}. Administrators
-have considerable freedom to enforce local policy on which routes to advertise,
-and which routes to use. Additionally, the metrics used in route selection
-include hop count and \ac{as} count, which may not correlate well with important
-path characteristics such as loss rate or latency.
+The Internet is made up of a vast number of \acp{as}, each containing many
+routers. These routers forward packets along their outgoing interfaces according
+to an internal forwarding table. This table is populated with routes learned
+from the external \ac{bgp} \cite{rfc4271}, as well as intra-\acs{as} protocols
+such as \ac{ospf} \cite{rfc2328}. Administrators have considerable freedom to
+enforce local policy on which routes to advertise, and which routes to use.
+Additionally, the metrics used in route selection include hop count and \ac{as}
+count, which may not correlate well with important path characteristics such as
+loss rate or latency.
 
 As a result, the default Internet path between hosts is not always the ``best
-path'' with respect to these characteristics. In \cite{detour}, Savage
-\textit{et al.} measured the pairwise latency and packet drop rates among a
-group of hosts. From this dataset, they searched for instances where these
-metrics were better along a ``detour'' route going through a third host. They
-found that half of all pairs of hosts had a ``detour'' route with lower latency,
-and 15\% of the pairs of hosts had a path with at least 25\% improvement in
-latency. For packet loss, 80\% of the pairs had a detour path with a lower
-packet loss rate, and in nearly half, the packet loss rate improved by a factor
-of six.
+path'' with respect to link or path characteristics. In fact, \ac{as} operators
+frequently have policies other than minimizing latency or loss \cite{detour}.
+Savage \textit{et al.} \cite{detour} measured the pairwise latency and packet
+loss rates among a group of hosts. From this dataset, they searched for
+instances where path characteristics along a route via a ``detour'' host were
+better than the default route. Savage \textit{et al.} \cite{detour} find that
+half of all pairs of hosts have a ``detour'' route with lower latency, and 15\%
+of the pairs of hosts have a path with at least 25\% improvement in latency. For
+packet loss, 80\% of the pairs have a detour path with a lower packet loss rate,
+and in nearly half, the packet loss rate improves by a factor of at least 6.
 
 Overlay networks have been proposed as a way to overcome the deficiencies of
-Internet paths These techniques create a second network on top of the existing
-Internet. Peers in these overlays are connected by \textit{virtual links}, which
-are simply routes in the underlying Internet. Packets are tunneled from peer to
-peer until reaching their end destination. Overlay networks like these have been
-shown to improve on path metrics like throughput and loss rates
-\cite{detour,ron}.
+Internet paths, by enabling strategies such as detour routing. These techniques
+create a second network on top of the existing Internet. Peers in these overlays
+are connected by \textit{virtual links}, which are simply routes in the
+underlying Internet. Packets are tunneled from peer to peer until reaching their
+end destination. Overlay routers may measure path characteristics and use these
+factors to construct routing tables. Thus, overlay networks enable detour routes
+which focus on optimal path characteristics. Overlay networks have been shown to
+improve on path metrics such as throughput and loss rates \cite{detour,ron}.
+However, applications must be modified to make use of most overlay networks,
+limiting their utility.
 
 \section{Access Link Underutilization}
 
-With the advent of fiber-to-the-home connections, residential access link speeds
-have been increasing. While conventional wisdom has been that access links are
-usually the bottleneck, this is not always the case \cite{akella2003empirical}.
-While they have increased, studies have shown that residential link bandwidths
-are not fully utilized, especially fiber connections \cite{fibertothehome}.
-There are many reasons why this is the case. For one, short-lived TCP
-connections may never leave the slow start phase. For another, TCP initial
-window settings may not be high enough to accommodate faster links. However,
-sometimes the default Internet route may not be able to accommodate these higher
-speeds.
+Since residential Internet access became commonplace, access link speeds have
+steadily increased. Technologies such as broadband, cable, and most recently
+fiber-to-the-home have enabled these continued increases. While conventional
+wisdom has been that access links are usually the bottleneck, this is not always
+the case \cite{akella2003empirical}. While access capacity has increased,
+studies have shown that residential link bandwidths are not fully utilized,
+especially fiber connections \cite{fibertothehome}. There are many reasons why
+this is the case. For one, short-lived TCP connections may never leave the slow
+start phase. For another, small send buffers limit the rate at which a TCP
+connection may send. However, sometimes the default Internet route may not be
+able to accommodate these higher speeds. With alternative routes available that
+may perform better, it makes sense to explore these alternative routes. Rather
+than selecting a single path, it also makes sense to use multiple paths
+simultaneously, aggregating their available throughput.
 
-With alternative routes available that may perform better, it makes sense to
-explore these alternative routes. Rather than selecting a single path, it also
-makes sense to use both simultaneously, aggregating their available throughput.
-
-\section{Contributions}
+\section{Concept}
 
 \begin{figure}
   \centering
@@ -235,27 +243,53 @@ makes sense to use both simultaneously, aggregating their available throughput.
   \label{fig:concept}
 \end{figure}
 
-This thesis presents a mechanism for single-homed devices to add alternative
-paths that traverse third-party ``detour'' hosts. This mechanism, illustrated in
-Figure~\ref{fig:concept} is based on \ac{mptcp}, establishing subflows through
-each alternative route. Using \ac{mptcp} allows multiple routes to be used for a
-single connection, with data divided across each route. Additionally, since
-\ac{mptcp} uses the same binary-compatible OS level API as TCP, unmodified
-applications may use this mechanism simply by using our patched kernel.
+While detour routing has been well established as a way to improve the quality
+of network paths, it has proved to be something of a mirage. Finding a way to
+allow everyday applications to leverage detours has been elusive. Similarly,
+data striping has been an appealing avenue for performance improvements, but
+applications must be designed around the concept in order to use it. As a
+result, both of these concepts have remained areas of research instead of being
+applied to our everyday applications.
+
+With the advent of \ac{mptcp}, we have an opportunity to revisit detouring and
+data-striping in a way that is transparent to the application. This thesis
+presents a mechanism for applying detour routing to \ac{mptcp} connections. The
+mechanism, illustrated in Figure~\ref{fig:concept}, establishes subflows across
+detour paths. By leveraging \ac{mptcp}, our mechanism is capable of striping
+data across the flows, aggregating the bandwidth of available paths. Most
+importantly, since \ac{mptcp} presents the same binary-compatible OS level API
+as TCP, unmodified applications may use this mechanism simply by using our
+patched kernel.
+
+We envision this system being best applied to a group of users which we refer to
+as a ``Detour Collective''. These users have high-bandwidth access links, and
+seek to improve application performance. By joining the collective, they offer
+their computer as a detour which other members may use. In return, they gain
+access to the detouring services of the other members of the collective. In
+effect, the collective forms an overlay network which unmodified TCP
+applications may use.
+
+This thesis focuses only on the implementation of the mechanism for adding
+detour paths to \ac{mptcp} connections. However, in Chapter~\ref{c:fw}, we will
+discuss implementation issues and potential challenges for the ``Detour
+Collective'', as future work for this thesis.
+
+\section{Contributions}
 
 The contributions of this thesis are as follows:
+
 \begin{itemize}
 \item We propose a method for leveraging detour routing in a way that is
-  transparent to the application, by using \ac{mptcp} on a single-homed host.
+  transparent to the application, by using \ac{mptcp}.
 \item We present a prototype implementation of this method based on a system of
   Linux kernel modifications and user-space tools.
 \item We evaluate this mechanism on emulated network topologies and on the
   Internet.
 \end{itemize}
 
-The remainder of this thesis will follow the following structure. Background
-information on \ac{mptcp} and the mechanisms used in the evaluation is covered
-in Chapter~\ref{c:bg}. Related work is discussed in Chapter~\ref{c:rw}. The
+The remainder of this thesis has the following structure. Background information
+on \ac{mptcp} and the mechanisms used in the evaluation is covered in
+Chapter~\ref{c:bg}. Related work is discussed in Chapter~\ref{c:rw}. The
 implementation of our system is described in Chapter~\ref{c:impl}. Experimental
 evaluation is presented in Chapter~\ref{c:eval}. Finally, future work is
 discussed in Chapter~\ref{c:fw} and we conclude in Chapter~\ref{c:conclusion}.
