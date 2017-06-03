@@ -1510,9 +1510,10 @@ underlying aspect of the mechanism.
 \chapter{Future Work}
 \label{c:fw}
 
-The mechanism described here is complete, but has the potential for improvement
-in several avenues. In this chapter, we describe several possible avenues for
-continued work and research.
+The mechanisms described in this thesis are the foundation for a much larger
+system, with many problems that must be solved before it can be generally
+deployable. In this chapter, we discuss these problems and other potential
+extensions to our work.
 
 \section{Detour Collective}
 
@@ -1520,7 +1521,7 @@ One fundamental question regarding the deployment of this mechanism has not yet
 been addressed: where are detour hosts found, and what is their motivation for
 forwarding traffic? One possibility is that a group of users could form a group
 that aims to help each other improve their connection quality. Some form of
-protocol, either centralized or decentralize, could allow users to join,
+protocol, either centralized or decentralized, could allow users to join,
 offering their computer as a detour, in return for the use of other detour
 hosts.
 
@@ -1537,20 +1538,61 @@ as a PKI root, they may ensure that only members of the collective could use
 their detouring services. By having their private key signed, users could gain
 access to the detouring services of other members.
 
+Another possibility for deployment could be through ISPs. While the
+inefficiencies created by policy routing on the Internet motivate this work,
+ISPs must also continue differentiating themselves to remain competitive to
+consumers. For example, Korea Telecom has launched an \ac{mptcp}-based proxy
+system to provide gigabit Internet speeds to smartphone users, and the IETF is
+currently discussing a draft about \ac{mptcp} proxying by ISPs
+\cite{boucadair-mptcp-plain-mode-10}. As a result, ISPs may also be interested
+in improving customer experience by implementing a detour system. An ISP could
+place detour points at several places in its network, and distribute detour
+information to customers via a centralized protocol. In this case, clients would
+not need to provide detouring services to each other, because the ISP provides
+them. Further, competing ISPs could federate detour systems (similar to peering
+agreements) so that their customers could gain access to better-situated detour
+points.
+
+\section{Detour Traffic Attribution}
+
+Similar to exit nodes in Tor \cite{tor}, detours act as exit points for unknown
+traffic. In both cases, traffic bound for the Internet must undergo \ac{nat},
+with the source address being replaced with the exit point's address. Thus,
+traffic emerging from a Tor exit or a detour can be wrongly attributed as
+originating from that host. Depending on the nature of the traffic, this can be
+dangerous for the exit node, as they could be held responsible for illegal
+activity. As a result, running a detour represents some risk.
+
+One potential mitigating factor could be the use of client certificates in the
+OpenVPN detour authentication process. By authenticating each other, a Detour
+can have cryptographically verified information about the client which will be
+using its services, assuming that this information is included in the
+certificate. Combined with detailed logging of outgoing connections, a Detour
+may accurately attribute connections to their source, providing strong evidence
+of innocence in the event of an investigation.
+
+Furthermore, while the goal of Tor is providing anonymity, the goal of our
+detour mechanism is improving performance and reliability. The anonymity
+provided by Tor is a lucrative resource to those using the Internet for illegal
+activity, and our service provides no such guarantee. As a result, the risks
+associated with running a detour are much lower than running a Tor exit node.
+However, these arguments do not fully address the traffic attribution problem,
+and future consideration is necessary for a full deployment of our mechanism.
+
 \section{Dynamic Source Routing}
 
 In the \ac{ron} system, overlay routing is performed at each node \cite{ron}.
 Similarly, the Detour study describes a system in which routing is performed at
-each overlay node \cite{detour}. In this system, we apply source routing. While
+each overlay node \cite{detour}. In our system, we apply source routing. While
 overlay routing mechanisms have been described for systems like \ac{ron} and
 Detour, we are unaware of algorithms which attempt to find the best route for a
 packet from its source, with incomplete knowledge of the capacity and state of
 the network links.
 
-An interesting extension to this work would be to extend it with such an
-algorithm. This algorithm would maintain several \ac{mptcp} subflows, and every
-so often it would decide to close one in favor of a new route. This decision
-would have to take into account at least the following factors:
+An extension to this work would be to extend it with such an algorithm. This
+algorithm would maintain several \ac{mptcp} subflows, and every so often it
+would decide to close one in favor of a new route. This decision would have to
+take into account at least the following factors:
 
 \begin{itemize}
 \item \ac{rtt} and observed loss rate of the subflow considered for eviction.
@@ -1578,18 +1620,34 @@ latency and loss rates, but it would only make sense when the connection is
 application limited. A network limited connection would be best served by a less
 wasteful strategy, such as the default Lowest \ac{rtt} First scheduler.
 
-\section{IP Options}
+\section{0-RTT NAT Establishment}
 
 Currently, the \ac{nat} forwarding mechanism uses a UDP-based protocol for
-requesting tunnels. As a result, there is a one \ac{rtt} overhead before each
-\ac{nat} detour may be established. However, the \ac{nat} tunnel has lower
-overhead than the VPN method, and thus performs measurably better. Removing the
-one \ac{rtt} delay could make the \ac{nat} method the best overall choice.
+requesting tunnels. This protocol is rather naive and vulnerable to many obvious
+exploits. While future work is required to harden this protocol, there are other
+possibilities which could eliminate the 1-RTT required to establish a NAT
+mapping. Since the NAT detouring mechanism has less space overhead, and
+therefore a measurable improvement over the VPN detour, eliminating this 1-RTT
+delay would remove the tradeoff between startup speed and overall throughput.
 
-It may be possible to embed the final destination of the initial \texttt{SYN}
-packet into an IP option. This would eliminate the need for a signaling
-protocol. This would require implementing a Netfilter module for the detour
-host's kernel.
+One possibility may be to embed the final destination of the initial
+\texttt{SYN} packet into an IP option. This would eliminate the need for a
+signaling protocol. This would require implementing a Netfilter module for the
+detour host's kernel. However, Medina \textit{et al.} \cite{medina2005measuring}
+measure that 70\% of TCP SYN packets carrying an unknown IP option are dropped.
+Additionally, Fonseca \textit{et al.} \cite{fonseca2005ip} measure that half of
+packets containing IP options are dropped. While it is possible that these 2005
+findings are no longer accurate, further investigation is required before
+investing in a solution based on IP options.
+
+Another possibility is to create a TCP option containing the destination
+address, and add it to the initial SYN. \ac{mptcp} requires TCP options in order
+to function, so TCP options would not incur the same compatibility concerns that
+IP options do. Yet another possibility is including the final destination within
+a data element of the TCP SYN packet. This strategy is used in the IETF's
+\ac{mptcp} proxying draft \cite{boucadair-mptcp-plain-mode-10} as a way to
+communicate the final destination of a SYN packet. In either of these cases, it
+is likely that kernel modifications would be necessary for the detour host.
 
 \chapter{Conclusion}
 \label{c:conclusion}
