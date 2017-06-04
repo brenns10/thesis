@@ -402,10 +402,10 @@ def run_exp_vanilla(instances, clients):
     # We need to wait until the openvpn interface is up. This will also
     # give us the peer IP address, which we already configured, but it's
     # always better to dynamically determine.
-    output = client_daemon_chan.recv(4096)
+    output = client_daemon_chan.recv(4096).decode('utf8')
     regexp = re.compile(r'ip addr add dev tun0 local ([0-9.]+) peer ([0-9.]+)')
     while not regexp.search(output):
-        output += client_daemon_chan.recv(4096)
+        output += client_daemon_chan.recv(4096).decode('utf8')
     match = regexp.search(output)
     local, peer = match.groups()
 
@@ -448,6 +448,11 @@ def main(vanilla=False):
             run_exp_vanilla(instances, clients)
         else:
             run_exp_mptcp(instances, clients)
+
+    except:
+        # report it so that debugging is better
+        import traceback
+        print(traceback.format_exc())
 
     finally:
         print('Opening ipdb... When you exit, we\'re done here.')
