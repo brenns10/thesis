@@ -139,7 +139,7 @@
       up with an improved path.
     \item At right, the default path from Los Altos to Walnut Creek has round
       trip time of 137 milliseconds, while the constituent paths of a detour
-      route through Santa Clara add up to 40 milliseconds
+      route through Santa Clara add up to 30 milliseconds
     \end{itemize}
 
   }
@@ -155,25 +155,22 @@
     RTT or loss rate via detour.
   \item In graph, blue is default route, yellow is best alternative route, and
     we compare loss rate
-  \item For majority of pairs, alternative route is more reliable.
-  \item For some pairs, reliability difference is staggering
+  \item For 80\% of pairs, alternative route is more reliable. For 25\% of
+    pairs, alternative route improves loss rate by at least a factor of 6
+  \item For some pairs, reliability difference is staggering!
   \end{itemize}
 
 }
 
 \begin{frame}
   \frametitle{Access Link Underutilization}
-  % this slide reads as very stupid - at least the first bullet point does.
-  % let's think about making a better case for improving links, network core
-  % bottlenecks, etc
-
   \begin{itemize}
-  \item Fiber-to-the-home is coming!
+  \item Residential bandwidth constantly improves
   \item However, residential bandwidth is not fully utilized
     \mycite{fibertothehome}
     \begin{itemize}
     \item Short-lived TCP sessions?
-    \item Small TCP initial window?
+    \item Anemic send buffers?
     \item Network core can't support bandwidth?
     \end{itemize}
   \item Using alternative routes can improve performance
@@ -199,34 +196,42 @@
   }
 \end{frame}
 
+\TitledFigureSlide{figures/Concept.pdf}{Concept}{
+  \begin{itemize}
+  \item Detour routing has shown promise for a long time
+  \item Some applications have been able to leverage it (e.g. Bittorrent)
+  \item However, few unmodified applications may use the detour routing strategy
+  \item Our concept is to use MPTCP to achieve detour routing in unmodified
+    applications
+  \item We use tunneling mechanisms to put a subflow across a detour host
+  \end{itemize}
+}
+
 \begin{frame}
   \frametitle{Contributions}
 
-  \textbf{Problem:} Internet routing inefficiencies can prevent TCP connections
-  from achieving their full potential throughput.
+  \textbf{Problem:} Unmodified applications cannot use detour routing to
+  circumvent Internet routing inefficiencies.
 
   \vspace{0.5cm}
 
-  \textbf{Solution:} A system which can use and aggregate alternative routes for
-  TCP connections.
+  \textbf{Solution:} An OS-level detour routing system that leverages Multipath
+  TCP (MPTCP).
 
   \vspace{0.5cm}
 
   \textbf{Contributions:}
 
   \begin{itemize}
-  \item A mechanism for adding alternative routes to Multipath TCP (MPTCP)
-    sessions among single-homed hosts.
-  \item An evaluation of this mechanism on emulated and real-world networks.
+  \item A method for performing detour routing with unmodified applications
+  \item A prototype implementation in the Linux kernel
+  \item An evaluation of this mechanism on emulated networks and the Internet
   \end{itemize}
   \note{
 
     \begin{itemize}
-    \item Putting together, problem: routing inefficiencies can prevent TCP
-      connections from achieving throughput.
-    \item Furthermore, while detour approaches are plentiful, and even a few
-      which use multiple paths, as well as application-level strategies, there
-      are no strategies which are usable by unmodified applications
+    \item Putting together, problem: unmodified applications can't take
+      advantage of detour routing solutions to Internet routing inefficiencies.
     \item A solution could be a system which uses and aggregates alternative
       routes for MPTCP connections.
     \item Contribution 1 - a mechanism for adding new routes to MPTCP
