@@ -387,9 +387,13 @@
 
 \section{Related Work}
 \SectionHead{}{
+
   \textbf{Transition:} Now in order to appreciate the place of this thesis,
-  let's examine some related work. The topic includes detour routing, overlay
-  routing, source routing, and multipath transport.
+  let's examine some related work. While there is a lot of related work, we will
+  restrict this discussion to three major points: overlay networks (which
+  operate at the network level), one very similar transport-layer approach, and
+  some application level approaches.
+
 }
 
 \subsection{Overlay Networks}
@@ -421,7 +425,7 @@
     \note[item]{mTCP: most important. A modification of TCP before
       MPTCP existed. Built on RON + userspace TCP stack. Did not have MPTCP
       compatibility concerns - routed segments across different paths. Worked on
-      single-homed devices due to RON}
+      single-homed devices due to RON. Unmodified applications may not use.}
     \end{itemize}
   \end{itemize}
 
@@ -429,32 +433,41 @@
 \end{frame}
 
 \begin{frame}
-  \frametitle{Other Related Items}
+  \frametitle{Application Layer}
 
-  \note[item]{Outside of overlay networks, several related pieces of work, both
-    in research and in the standards bodies.}
+  \note[item]{Outside of network-layer approaches, lots of app level approaches
+    to overlays, detours, and bandwidth aggregation.}
+  \note[item]{Since none of the net-layer approaches can be applied to
+    unmodified apps, apps designed around overlays/detours are the only ones
+    which can be used.}
 
   \begin{itemize}
-  \item Source routing (IPv4) and segment routing (IPv6)
-    \note[item]{Notable - it is possible to specify intermediaries in both IPv4
-      and IPv6. For security reasons these aren't respected. Standards exist
-      mainly for use in internal networks.}
-  \item Binder: aggregating bandwidth of several Internet gateways
-    \mycite{binder}
-    \note[item]{One use of MPTCP that is very similar was called Binder. A rural
-      town was away from any ISP. Had several potential gateways far away, but
-      low bandwidth and not good reliability. Established connections across
-      each gateway, and created an OpenVPN connection to an Internet-side
-      server, with subflow across each.}
-  \item SOSR: Scalable One-hop Source Routing \mycite{gummadi2004improving}
-    \note[item]{Work inspired by RON,
-      but trying to simplify. This work simply tunneled connections across a
-      single hop, using a NAT approach similar to ours. Found they got most of
-      RON's benefit without the full overlay system.}
-  \item IETF MPTCP proxying draft
-    \note[item]{Similar because allows single-homed devices to use MPTCP.
-      However this approach expects non MPTCP server, and is ``transparent''
-      proxy.}
+    \item Gnutella\mycite{adar2000free}
+      \note[item]{\textbf{Gnutella} was a file sharing network. It allowed
+        queries and responses to be forwarded from peer to peer as an overlay.
+        But actual file exchanges were single path.}
+      \begin{itemize}
+      \item Requests forwarded via overlay network
+      \item Content exchanged via single path
+      \end{itemize}
+    \item BitTorrent\mycite{cohen2003incentives}
+      \note[item]{\textbf{BitTorrent} is a protocol for file sharing which
+        allows content to be exchanged along the overlay. Each peer shares with
+        many other peers. Somewhat similar to detour routing - gets around
+        routing inefficiencies by simply using more paths}
+      \begin{itemize}
+      \item Pieces of content exchanged between many pairs of peers
+      \item Multiple paths simulate detour routing
+      \end{itemize}
+    \item HTTP Range Requests\mycite{kaspar2010enhancing}
+      \note[item]{\textbf{HTTP Range Requests} allow an app to request byte
+        ranges of a file. Kaspar et al demonstrate a mechanism for downloading
+        or streaming a file using range requests on multiple network interfaces}
+      \begin{itemize}
+      \item Range requests allow requesting byte ranges of a file
+      \item Request from different network interfaces or to different endpoints
+        to create alternative paths
+      \end{itemize}
   \end{itemize}
 
   \note[item]{\textbf{Remember:} \textit{No ``last piece'' of related work.}}

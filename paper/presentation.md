@@ -18,14 +18,14 @@ Rehearsal Comments
 ------------------
 
 - [x] Number slides!
-- [ ] In overview - no point about the "idea"
+- [x] In overview - no point about the "idea"
 - [x] Shortest path - in terms of AS hops
 - [x] See if you can squeeze actual paper refs
 - [x] Cut these "We are going to move right along" transitions. Rather, "before
   explaining my solution to ... let us briefly survey the background information
   on MPTCP and related work". E.g., your transition to Rel Work was fine.
 - [x] Mention that MPTCP API to apps is unchanged.
-- [ ] Check how much apps are affected by mTCP
+- [x] Check how much apps are affected by mTCP
 - [x] Avoid statements like "A last piece of rel work" - you can never claim you
   found the last re. work.
 - [x] Perhaps title the slide with with triangular communication "Idea
