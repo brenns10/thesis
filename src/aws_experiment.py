@@ -393,9 +393,8 @@ def run_exp_vanilla(instances, clients):
     client_daemon_chan = long_running_cmd(
         client_transport,
         'sudo openvpn --remote %s 1194 udp --client --dev tun '
-        '--ca ../tmp/ca.crt --cert ../tmp/client1.crt '
-        '--key ../tmp/client1.key ' '--topology p2p --pull '
-        '--nobind &' % detour_ip,
+        '--ca tmp/ca.crt --cert tmp/client1.crt --key tmp/client1.key '
+        '--topology p2p --pull --nobind &' % detour_ip,
     )
 
     print('Waiting for OpenVPN peer address')
@@ -412,7 +411,8 @@ def run_exp_vanilla(instances, clients):
     # Now we configure a specific route so that iperf traffic goes through
     # OpenVPN.
     print('Setting OpenVPN routing rule...')
-    blocking_cmd('sudo route add -host %s gw %s' % (server_ip, peer))
+    blocking_cmd(client_transport,
+                 'sudo route add -host %s gw %s' % (server_ip, peer))
 
     # do vpn trials
     server_output = BytesIO()
