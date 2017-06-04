@@ -102,6 +102,10 @@
   short = HTTP,
   long  = Hypertext Transfer Protocol
 }
+\DeclareAcronym{pki}{
+  short = PKI,
+  long  = Public Key Infrastructure
+}
 
 \begin{document}
 \advisor{Michael Rabinovich}
@@ -651,7 +655,7 @@ intermediary performs \ac{nat}, so that reply traffic is forwarded back to the
 destination. Using \ac{sosr} and randomly selected PlanetLab intermediaries,
 they were able to recover from 56\% of failures on the paths to popular web
 servers. However, they did not report the throughput of \ac{sosr} paths. In this
-thesis, we use an approach very similar to Gummadi \textit{et al.} in simply
+thesis, we use an approach similar to Gummadi \textit{et al.} in simply
 tunneling traffic across a chosen intermediary, rather than constructing a
 complete overlay network.
 
@@ -904,10 +908,11 @@ detour host. These components are illustrated in Figure~\ref{f:MovingParts}.
   \centering
   \includegraphics[width=0.8\textwidth]{figures/MovingParts.pdf}
   \caption[Interaction of client, detour, and server]{
-    The components and their communications. In \textbf{A}, the path manager
-    requests an overlay route. In \textbf{B}, the client daemon reports overlay
-    routes back to the path managers. In \textbf{C} and \textbf{D}, the client
-    and detour daemons negotiate an overlay route. In \textbf{E}, a subflow is
+    The components and their communications. In \textbf{A}, the initial subflow
+    across the default route is created. In \textbf{B}, the path manager
+    requests an overlay route. In \textbf{C}, the client daemon reports overlay
+    routes back to the path managers. In \textbf{D} and \textbf{E}, the client
+    and detour daemons negotiate an overlay route. In \textbf{F}, a subflow is
     created through the detour.
   }
   \label{f:MovingParts}
@@ -922,8 +927,8 @@ are currently selected from a static configuration file. The client and detour
 daemons negotiate a tunnel, which may be implemented in two different ways. The
 client reports this back to the kernel, which creates subflows for the
 \ac{mptcp} connection across every available detour, until a predefined limit is
-reached. In our implementation, this limit is two, but it may be modified by a
-sysctl.
+reached. In our implementation, this limit is two, but it may be set by an
+administrator using the \texttt{sysctl} tool.
 
 In the remainder of this chapter, we will discuss each of these components at
 length.
@@ -953,27 +958,26 @@ configured as follows:
 \item The initial connection negotiation requires the client and server to
   exchange certificates. This mutual authentication process could be used to
   protect both the client and detour from working with a peer that is not a
-  member of their ``co-operative''. Further, the certificate can be used to
+  member of their ``Detour Collective''. Further, the certificate can be used to
   provide accountability for the origin of detoured traffic, lowering the risk
-  to a detour server.
-  % TODO: link to a 'challenges' section in Future Work when I create it. This
-  % is a great tie-in and a great counter-point to some of the challenges.
+  to a detour server. These applications of certificate verification are
+  discussed further in Chapter~\ref{c:fw}.
 \item Subsequent messages are not protected by encryption or signatures, to
-  reduce per-packet space and time overhead. Justification for this decision,
-  and further discussion of the security of the mechanism, may be found in
-  Section~\ref{sec:security}.
+  reduce per-packet space and time overhead. In the case of a malicious detour,
+  these cannot provide any additional security, because traffic would be
+  decrypted at the detour before forwarding.
 \end{itemize}
 
-Clients connect to this VPN, creating a virtual network interface. The
-client receives a routing rule from the detour advertising that it can reach all
-hosts on the Internet with a very high cost. As a result, the client operating
-system will prefer other routes instead of the VPN. However, the route is
-available for the path manager to route subflows along.
+Clients connect to this VPN, creating a virtual network interface. The client
+receives a routing rule from the detour advertising that it can reach all hosts
+on the Internet with a high cost. As a result, the client operating system will
+prefer other routes instead of the VPN. However, the route is available for the
+path manager to route subflows along.
 
 One important aspect of VPN configuration is that the detour must create a
-private IP subnet. It provides a DHCP service in order to assign IP addresses to
-clients as they connect to the VPN. Clients are expected to be able to connect
-to multiple detours simultaneously. In order to do this without conflict, each
+private IP subnet. It provides a DHCP service \cite{rfc2131} to assign IP
+addresses to clients as they connect to the VPN. Clients are expected to be able
+to connect to multiple detours simultaneously. To do this without conflict, each
 detour must use a distinct private IP subnet, so that there is no chance of the
 client addresses overlapping, and also so that the gateway address of the VPN is
 unique on the client.
@@ -982,16 +986,20 @@ In a large-scale implementation of this technology, these subnet allocations
 could be handled by a centralized detour management server, or an appropriate
 distributed protocol among the detours. The 10.0.0.0/8 subnet is reserved for
 private networks, and if each detour were to establish its own /24 subnet, there
-would be capacity for 65,536 non-conflicting subnets. However, in our testing,
-subnets were manually allocated to avoid conflicts.
+would be capacity for 65,536 non-conflicting subnets. A random subnet and IP
+allocation may also be sufficient. Collisions in IP namespaces would render a
+detour unusable for a particular client. However, in a situation with enough
+detours to make collisions likely, many alternative detours would exist for a
+client to fall back on. In our testing, subnets were manually allocated to avoid
+conflicts.
 
-Finally, in order to forward VPN traffic to the internet, the detour must be
+Finally, in order to forward VPN traffic to the Internet, the detour must be
 configured (via Netfilter) to perform network address translation (\ac{nat}) on
 outgoing packets. This process is typical for a home router and for VPNs which
-provide Internet access. As discussed earlier, \ac{mptcp} is designed with this
-behavior in mind, and so it is capable of functioning through \ac{nat}, so long
-as the middleboxes do not remove TCP options in transit, or modify data contents
-\cite{rfc6182}.
+provide Internet access \cite{rfc3022,yonan2007openvpn}. As discussed earlier,
+\ac{mptcp} is designed with this behavior in mind, and so it is capable of
+functioning through \ac{nat}, so long as the middleboxes do not remove TCP
+options in transit, or modify data contents \cite{rfc6182}.
 
 The OpenVPN implementation has several attractive qualities. First, it relies on
 a well-used protocol for forwarding traffic. Second, an established OpenVPN
@@ -1035,28 +1043,22 @@ protocol based on UDP.
 The Linux kernel's Netfilter framework allows for two types of \ac{nat},
 illustrated in Figure~\ref{fig:NATTypes} \cite{russell2002nat}. The first kind,
 source \ac{nat} (SNAT), rewrites the source address of the packet. This is the
-typical form of \ac{nat} used by home routers: the source address of an outgoing
-connection is rewritten to be the router's external IP address, but the
-destination is unchanged. This type of rule is applied after routing has taken
-place. The second kind of \ac{nat} supported by Netfilter is destination
-\ac{nat} (or DNAT) which rewrites the destination of the packet. This rule is
-applied before routing, so that a proper interface can be selected for the new
-address.
+typical form of \ac{nat} used by home routers: the source address of each
+outgoing packet is rewritten to be the router's external IP address, but the
+destination is unchanged \cite{rfc3022}. This type of rule is applied after
+routing has taken place. The second kind of \ac{nat} supported by Netfilter is
+destination \ac{nat} (or DNAT) which rewrites the destination of the packet.
+This rule is applied before routing, so that a proper interface can be selected
+for the new address.
 
 The detour takes advantage of both forms of \ac{nat} offered by the kernel.
 First, it applies DNAT, setting the destination address to be the final server's
 IP address (signaled ahead of time). Then, it applies SNAT, setting the source
 address to be its own external IP. The Netfilter framework remembers these
 connections so that reply packets are properly forwarded back to the client.
-
 Thanks to Netfilter, this \ac{nat} mapping can be arranged with two
 \texttt{iptables} commands, with no custom kernel or user-space code required
-for packet forwarding. It is possible to implement this in userspace using
-Netfilter-Queue and a user-space application, but this approach has several
-drawbacks. It would have to be single-threaded, and it would require that packet
-data be copied from kernel space into user space and back. More critically, the
-connection tracking provided by the kernel is more robust than what would be
-implemented by user space.
+for packet forwarding.
 
 As mentioned earlier, the server address must be communicated to the detour
 ahead of time in order to use this scheme. To that end, we have designed a
@@ -1171,24 +1173,34 @@ rules are applied in reverse to response packets.
 The detour daemon is implemented as a Python script. It listens for tunnel
 requests, executes the correct commands to create them, and then sends
 responses. It ensures that detour ports do not conflict with each other, or with
-ports that are open on the daemon machine. It also ensures that on termination,
-all tunnels are torn down.
+ports that are open on the daemon machine. It also ensures that on termination
+of the detour daemon, all tunnels are torn down.
 
 This mechanism has the advantage that it requires zero space overhead within the
 packet. Since no headers are added, the full amount of data may be transmitted
-on these segments. However, its disadvantage is that tunnels must be configured
+in these segments. However, the disadvantage is that tunnels must be configured
 each time a new \ac{mptcp} connection is created on the client. In the case of
 OpenVPN, a new subflow may be tunneled through an existing OpenVPN connection
 without any additional signaling with the detour. However, with the \ac{nat}
 approach, each time a subflow is initiated with a new server, a tunnel must
 first be negotiated with the detour server, incurring an \ac{rtt} delay.
 
+The protocol described here is rather na\"ive. Similar to DNS, this protocol is
+vulnerable to spoofing attacks for replies. Additionally, malicious clients may
+use this protocol to create large amounts of detours, exhausting resources on
+the detour machine. The protocol here is not intended to be secure against these
+types of attacks. Rather, the protocol is designed to assess the efficacy of a
+\ac{nat} based approach. It is the subject of future work to design a more
+secure protocol or create a new \ac{nat} signalling mechanism. These issues are
+discussed in Section~\ref{sec:0rtt-nat}.
+
 \section{Path Manager}
 
-To enable subflows to use the detours created above, we implement a custom
-\ac{mptcp} path manager within the Linux kernel. As previously described, the
-path manager is a module which dictates local policy for creating new subflows
-and announcing local addresses to the \ac{mptcp} peer.
+As previously described, the path manager is a module which dictates local
+policy for creating new subflows and announcing local addresses to the
+\ac{mptcp} peer. To enable subflows to use the detours created by the above
+mechanisms, we implement a custom \ac{mptcp} path manager within the Linux
+kernel.
 
 \begin{figure}
   \centering
@@ -1197,15 +1209,14 @@ and announcing local addresses to the \ac{mptcp} peer.
   \label{fig:KernDataStruct}
 \end{figure}
 
-The path manager receives space within the \ac{mptcp} control buffer in order to
-track state, and it registers a set of callbacks with the protocol, so that it
-can be notified of events as they occur. Global state, such as the list of
-available detours, must be stored on a per-network namespace basis. This is
-required not only to satisfy the demands of a modern kernel which supports
-namespacing and containerization, but also so that experiments using Mininet,
-which relies on namespaces, run successfully. A simplified view of the data
-structures maintained by the path manager is presented in
-Figure~\ref{fig:KernDataStruct}.
+The path manager receives space within the \ac{mptcp} control buffer to track
+state, and it registers a set of callbacks with the protocol, so that it can be
+notified of events as they occur. Global state, such as the list of available
+detours, must be stored on a per-network namespace basis. This is required not
+only to satisfy the demands of a modern kernel which supports namespacing and
+containerization, but also so that experiments using Mininet, which relies on
+namespaces, run successfully. A simplified view of the data structures
+maintained by the path manager is presented in Figure~\ref{fig:KernDataStruct}.
 
 The path manager consists of two main components. First, a subflow worker which
 selects and adds detour subflows to an \ac{mptcp} connection. Second, a Generic
@@ -1215,31 +1226,34 @@ exchanged with user-space components.
 \subsection{Subflow Worker}
 
 The subflow worker runs in two situations, in the context of a particular
-\ac{mptcp} socket. First, when a \ac{mptcp} connection becomes fully established
-(i.e. after the three-way handshake completes). Second, when a new detour has
-been made available to this network namespace, and the detour could be used for
-this connection.
+\ac{mptcp} socket: (i) when a \ac{mptcp} connection becomes fully established
+(i.e. after the three-way handshake completes), and (ii) when a new detour has
+been made available to a connection's network namespace, and the detour could be
+used for that connection.
 
-On its first run, the subflow worker uses the Generic Netlink communication
-interface (described in Section~\ref{s:genl}) to request a detour from the
-client daemon. It does this even if detours are already available, so that the
-client daemon may create and report new ones. Then, the path manager looks
-through the internal lists of detours in the network namespace of the socket.
-The path manager maintains two lists of detours per network namespace. The first
-is a list of OpenVPN detours. These detour entries are not specific to a server,
-and they simply indicate the name of a network interface to use. The second list
-contains \ac{nat} detours. These consist of a detour address and port, and a
-server address and port. The worker may only select \ac{nat} entries which match
-the destination address and port of the current connection.
+When an \ac{mptcp} connection becomes fully established, the subflow worker
+starts for the first time. At this point, it uses the Generic Netlink
+communication interface (described in Section~\ref{s:genl}) to request a detour
+from the client daemon. It does this even if detours are already available, so
+that the client daemon may create and report new ones. Then, the path manager
+looks through the internal lists of detours in the network namespace of the
+socket. The path manager maintains two lists of potential detours per network
+namespace. The first is a list of OpenVPN detours. These detour entries are not
+specific to a server, and they simply indicate the name of a network interface
+to use. The second list contains \ac{nat} detours. These consist of a detour
+address and port, and a server address and port. The worker may only select
+\ac{nat} entries which match the destination address and port of the current
+connection.
 
-The task attempts to add up to $N$ subflows, where $N$ is a configurable limit.
-It terminates in one of two ways. Either it has exhaused all of the available
-detours, but not yet created all $N$ subflows. Otherwise, if it creates $N$
-subflows successfully, it stops looking through the list, even if more detours
-are available. If OpenVPN detours are available, then they take precedence over
-the \ac{nat} detours, because they are available immediately. \ac{nat} detours
-created by the client daemon become available only once the daemon has processed
-the request from the kernel.
+The subflow worker then attempts to add up to $N$ subflows, where $N$ is a
+configurable limit. The worker may terminate in one of two ways. Either it has
+exhaused all of the available detours, but not yet created all $N$ subflows.
+Otherwise, if it creates $N$ subflows successfully, it stops looking through the
+list, even if more detours are available. When the number of available detours
+exceeds $N$, the first $N$ detours, ordered from oldest to newest, are chosen.
+If OpenVPN detours are available, then they take precedence over the \ac{nat}
+detours, because they are available immediately. \ac{nat} detours are only
+available after the successful exchange described in Section~\ref{sec:nat}.
 
 \subsection{Generic Netlink}
 \label{s:genl}
@@ -1274,13 +1288,13 @@ implemented:
 \item \texttt{DETOUR\_C\_REQ}: An announcement message sent from the kernel to a
   multicast group, which the client daemon subscribes to. Specifies a remote
   address and port which the kernel would like to create a detour to.
-\item \texttt{DETOUR\_C\_ADD}: A command sent from userspace to the kernel. Adds
-  a detour (of type \ac{nat} or VPN) to the kernel's internal list of detours.
-  When a new, unique detour is received, the path manager runs the subflow
-  worker again for every connection which can use it. This gives every
-  connection the opportunity to create a subflow along new detours.
-\item \texttt{DETOUR\_C\_DEL}: A command sent from userspace to the kernel.
-  Removes a detour from the kernel's internal list. This does not cancel any
+\item \texttt{DETOUR\_C\_ADD}: A command sent from userspace to the kernel that
+  adds a detour (of type \ac{nat} or VPN) to the kernel's internal list of
+  detours. When a new, unique detour is received, each connection in the
+  namespace is informed of the new detour. This gives every connection the
+  opportunity to create a subflow along new detours.
+\item \texttt{DETOUR\_C\_DEL}: A command sent from userspace to the kernel that
+  removes a detour from the kernel's internal list. This does not cancel any
   subflows currently using the detour.
 \item \texttt{DETOUR\_C\_ECHO}: A command sent from userspace to the kernel,
   requesting that the kernel write out its list of detours to the kernel log.
@@ -1324,33 +1338,36 @@ detours when their corresponding network namespace is closed.
 \section{Security Considerations}
 \label{sec:security}
 
-% TODO: I need to dramatically improve this section. Mark had some good
-% criticisms about simply waving the TLS flag and moving on. Plus I've now
-% referenced this from the no-encryption point in the OpenVPN section, and I
-% need to ensure that I justify that decision here.
+There are several considerations that must be made for security in this system.
+Since detours are along the route of a second subflow, they are able to observe
+the destinations of all \ac{mptcp} connections which a client wishes to detour
+through them. There is no way to prevent this leak of information, since detours
+must know the destination to perform forwarding.
 
-Using this mechanism, a malicious third-party detour could be given access to
-read and modify the partial contents of an \ac{mptcp} connection. We believe
-that this risk is mitigated by the following factors:
+Another serious concern is that detours may record, modify, or forge traffic
+between the client and server. This risk exists with routers and middleboxes on
+the path of any TCP connection. However, with our system, the detour may be
+controlled by an arbitrary user on the network edge, rather than having a
+privileged location within the network core.
 
-\begin{itemize}
-\item Usage of TLS, especially in the web, is becoming ubiquitous. Due to the
-  design of our \ac{mptcp} and our system, the initial three-way handshake of
-  TCP is completed before any subflows can begin initialization. TLS handshake
-  information will thus be exchanged on the first subflow, before or
-  concurrently with the establishment of additional subflows. As a result,
-  connections can be protected by TLS by the time additional subflows are
-  transmitting data. TLS encrypts data, protecting the privacy of the
-  transmission, and detects modifications, preventing modification of data by a
-  malicious detour.
-\item Modifications of data that result in changing the \ac{dss} mapping size
-  are likely to be detected and treated as a \ac{mptcp} protocol error.
-\item A large-scale implementation of this mechanism could involve mutual
-  authentication of the client and detour, via PKI. So long as a third party can
-  be trusted to verify that a detour is malicious, and the third party can be
-  trusted, a scheme like this can prevent malicious third-parties from being
-  used as detours.
-\end{itemize}
+An application may use TLS on the connection in order to mitigate some of this
+risk. The TLS handshake information will be exchanged on the first subflow,
+before detour subflows are established. As a result, a detour subflow that
+carries TLS will already be fully encrypted, protecting both the privacy of the
+connection, and preventing modification.
+
+Applications which do not use TLS are still at risk of attack by a malicious
+detour. Small detour collectives made up of individuals with mutual trust could
+use the certificate verification features of OpenVPN to protect themselves.
+These collectives might create a single root certificate and use that to sign
+each member's key. Clients and detours could then authenticate each other as
+members of the same collective. However, larger collectives would have to deal
+with the same systemic issues that other large-scale \acp{pki} face:
+over-privileged intermediates, poor identity verification practices, aging
+cryptography, etc \cite{durumeric2013analysis}. An alternative could be a more
+distributed web-of-trust model \cite{abdul1997pgp}, but this would require new
+authentication mechanisms outside of OpenVPN. In any case, the security of a
+detour in a ``Detour Collective'' is still an area requiring future work.
 
 \chapter{Evaluation}
 \label{c:eval}
@@ -1737,6 +1754,7 @@ application limited. A network limited connection would be best served by a less
 wasteful strategy, such as the default Lowest \ac{rtt} First scheduler.
 
 \section{0-RTT NAT Establishment}
+\label{sec:0rtt-nat}
 
 Currently, the \ac{nat} forwarding mechanism uses a UDP-based protocol for
 requesting tunnels. This protocol is rather naive and vulnerable to many obvious
