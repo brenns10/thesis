@@ -12,6 +12,7 @@
 \usepackage[export]{adjustbox}
 \usepackage{graphicx}
 \usepackage{fancyvrb}
+\usepackage{bytefield}
 \usepackage[style=authoryear,backend=bibtex]{biblatex}
 \setbeamertemplate{note page}[plain]
 \setbeameroption{show notes on second screen=right}
@@ -572,15 +573,12 @@
 
   \begin{center}
     \vfill
-\begin{BVerbatim}
-+-----------------------------------+
-| ver(1) | op(1)  | reserved (2)    |
-+-----------------------------------+
-|           rip (4 bytes)           |
-+-----------------------------------+
-| rpt (2 bytes)   | dpt (2 bytes)   |
-+-----------------|-----------------+
-\end{BVerbatim}
+    \begin{bytefield}[bitwidth=0.6em]{32}
+      \bitheader{0,7,8,15,16,23,24,31}\\
+      \bitbox{8}{\texttt{ver}} & \bitbox{8}{\texttt{op}} & \bitbox{16}{\texttt{reserved}} \\
+      \wordbox{1}{\texttt{rip}} \\
+      \bitbox{16}{\texttt{rpt}} & \bitbox{16}{\texttt{dpt}} \\
+    \end{bytefield}
     \vfill
 
     Custom protocol for arranging NAT detours
