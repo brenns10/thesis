@@ -33,10 +33,10 @@ Rehearsal Comments
 - [ ] Have a diagram for interaction between components on the client?
   - In particular, this comment means to show graphically the steps that happen
     for a run of the mechanism (arrow showing request moving through, etc)
-- [ ] Evaluation of the overhead?
-- [ ] What is the workload in your experiments?
+- [x] Evaluation of the overhead?
+- [x] What is the workload in your experiments?
 - [ ] Detour collective - sharing economy?
-- [ ] Related work - mention HTTP range requests and requesting embedded objects
+- [x] Related work - mention HTTP range requests and requesting embedded objects
   in parallel from different server replicas
 - [ ] (**Big One**) Use packet trace to see what fraction of data went along
   each subflow.

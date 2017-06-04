@@ -699,19 +699,19 @@
 }
 
 \begin{frame}
-  \frametitle{Types of Experiment}
+  \frametitle{Types of Experiments}
 
   \begin{itemize}
   \item Previous work has established that there do exist common scenarios where
     detour routing can improve path characteristics
-  \item These experiments do not duplicate results
-  \item Answer the following:
+  \item We simply attempt show mechanism works as expected
+  \item Answer the following
     \begin{itemize}
-    \item Given a network where an alternative route has better properties, can
-      this mechanism effectively use it?
-    \item Given a network where there is an alternative route and the potential
-      for aggregation, can this mechanism aggregate throughput?
-    \item Can this mechanism run without modification on the Internet?
+    \item Can we achieve throughput of best available path?
+    \item When bandwidth aggregation is possible, can we aggregate path
+      bandwidth?
+    \item What overheads exist in this mechanism?
+    \item Can this mechanism be used across the Internet at higher throughput?
     \end{itemize}
   \end{itemize}
 \end{frame}
@@ -749,10 +749,16 @@
   \item Three variations:
     \begin{itemize}
     \item \textbf{Normal:} no loss
-    \item \textbf{Lossy:} 1\% packet loss on Link 2
-    \item \textbf{Delayed:} 100ms delay on Link 2
+    \item \textbf{Lossy:} 1\% packet loss on Link 2 \note[item]{For lossy, we
+        tried 0.5\%, 1\%, 2\%, and 5\%. Both 1 and 2 were reasonable - causing
+        decreased throughput but not too bad. 0.5 had nearly no effect. 5 had
+        too much of an effect. Can show graphs if interested.}
+    \item \textbf{Delayed:} 100ms delay on Link 2 \note[item]{For latency, we
+        tried 20 and 50 ms. 100 only just started to show throughput drop,
+        likely due to slow start.} \note[item]{Large differences in latency
+        affect MPTCP more - needs huge buffers to achieve full potential.}
     \end{itemize}
-  \item Total of 6 scenarios
+  \item Workload: send as much data as possible from client to server
   \end{itemize}
 \end{frame}
 
@@ -767,7 +773,8 @@
   \item \textbf{TCP(NAT):} TCP via the NAT tunnel
   \item \textbf{TCP(VPN):} TCP via the VPN tunnel
   \end{itemize}
-  \note[item]{Don't forget to say we use iperf to measure throughput}
+  \note[item]{Don't forget to say we use iperf to measure throughput, and try to
+  send lots of data.}
 \end{frame}
 
 \begin{frame}
@@ -777,10 +784,17 @@
 \FigureSlide{figures/sym.pdf}{
   \begin{itemize}
   \item This is a comparison of throughput on Symmetric, Normal. takeaways:
-  \item (1) MPTCP is more variable than TCP
-  \item (2) The VPN and NAT approaches don't perform as well when there is
-    nothing to gain. This seems to be a result of their overhead and maybe
-    congestion control.
+  \item (1) MPTCP has about 140 kbps overhead compared to standard TCP, or about
+    1.5\%
+  \item Incidentally, segment size 1460, 28 byte overhead of DSS, puts overhead
+    at 1.9\%, so not terribly far off.
+  \item (2) NAT has no observable overhead in terms of throughput
+  \item (3) VPN has observable overhead. 630kbps overhead, or about 6.6\%
+  \item Incidintally, segment size 1337 compared to 1432 is about 6.6\%, so spot
+    on!
+  \item (4) When VPN used with MPTCP, overhead falls to somewhere between the
+    1.5\% and 6.6\%, since data is split across a 1.5\% overhead and 6.6\%
+    overhead subflow
   \end{itemize}
 }
 
@@ -788,17 +802,21 @@
   \frametitle{Results}
 
   \begin{itemize}
-  \item MPTCP trials are more variable
-  \item Mechanism introduces overhead when there is no potential for gain
+  \item MPTCP has 140kbps, or about 1.5\% overhead
+  \item VPN approach has overhead of about 6.6\%
+  \item Mechanism performs well even when no aggregation benefit possible
   \end{itemize}
 \end{frame}
 
 \FigureSlide{figures/sym-lossy.pdf}{
   \begin{itemize}
   \item When a small loss rate is added, the story begins to change.
-  \item Suddenly, MPTCP NAT and VPN are performing very comparably to vanilla
-    TCP over those same paths
-  \item MPTCP 1 subflow takes a huge performance hit
+  \item MPTCP NAT and VPN are performing very comparably to vanilla TCP over
+    those same paths
+  \item MPTCP 1 subflow takes a bigger performance hit than TCP, likely due to
+    its more conservative congestion control
+  \item MPTCP NAT and VPN have more variance because ACKS are transmitted on
+    both paths and get lost
   \end{itemize}
 }
 
@@ -806,8 +824,9 @@
   \frametitle{Results}
 
   \begin{itemize}
-  \item MPTCP trials are more variable
-  \item Mechanism introduces overhead when there is no potential for gain
+  \item MPTCP has 140kbps, or about 1.5\% overhead
+  \item VPN approach has overhead of about 6.6\%
+  \item Mechanism performs well even when no aggregation benefit possible
   \item Mechanism performs similarly to TCP over best path when the default path
     has loss
   \end{itemize}
@@ -817,7 +836,8 @@
   \begin{itemize}
   \item When there is the potential to aggregate throughput, the story changes
     again.
-  \item The mechanism is capable of aggregating nearly all bandwidth
+  \item The mechanism achieves 98.5\% aggregation for NAT and 98.1\% aggregation
+    for VPN
   \end{itemize}
 }
 
@@ -825,8 +845,9 @@
   \frametitle{Results}
 
   \begin{itemize}
-  \item MPTCP trials are more variable
-  \item Mechanism introduces overhead when there is no potential for gain
+  \item MPTCP has 140kbps, or about 1.5\% overhead
+  \item VPN approach has overhead of about 6.6\%
+  \item Mechanism performs well even when no aggregation benefit possible
   \item Mechanism performs similarly to TCP over best path when the default path
     has loss
   \item Mechanism can effectively aggregate bandwidth when the network has the
@@ -844,8 +865,9 @@
   \frametitle{Results}
 
   \begin{itemize}
-  \item MPTCP trials are more variable
-  \item Mechanism introduces overhead when there is no potential for gain
+  \item MPTCP has 140kbps, or about 1.5\% overhead
+  \item VPN approach has overhead of about 6.6\%
+  \item Mechanism performs well even when no aggregation benefit possible
   \item Mechanism performs similarly to TCP over best path when the default path
     has loss
   \item Mechanism can effectively aggregate bandwidth when the network has the
@@ -855,8 +877,9 @@
 
 \FigureSlide{figures/delayed.pdf}{
   \begin{itemize}
-  \item With delayed link, there are some funky interactions with slow slow
-    start, but MPTCP still outperforms the best paths
+  \item With delayed link, MPTCP has more variance.
+  \item Similar to lossy link, ACKS can come on high latency link, blocking
+    receive window advance
   \end{itemize}
 }
 
@@ -864,8 +887,9 @@
   \frametitle{Results}
 
   \begin{itemize}
-  \item MPTCP trials are more variable
-  \item Mechanism introduces overhead when there is no potential for gain
+  \item MPTCP has 140kbps, or about 1.5\% overhead
+  \item VPN approach has overhead of about 6.6\%
+  \item Mechanism performs well even when no aggregation benefit possible
   \item Mechanism performs similarly to TCP over best path when the default path
     has loss
   \item Mechanism can effectively aggregate bandwidth when the network has the
