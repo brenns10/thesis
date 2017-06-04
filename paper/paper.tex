@@ -15,6 +15,8 @@
 \usepackage{fancyvrb}
 \usepackage{acro}
 \usepackage{hyperref}
+\usepackage{multicol}
+\usepackage{bytefield}
 \definecolor{mygreen}{rgb}{0,0.6,0}
 \definecolor{mygray}{rgb}{0.5,0.5,0.5}
 \definecolor{mymauve}{rgb}{0.58,0,0.82}
@@ -328,15 +330,17 @@ designed as a protocol extension to TCP, which allows multiple interfaces (and
 as a result, network paths) to be used in the same TCP stream.
 
 \subsection{Design Considerations}
+\label{sec:mptcp-design}
 
 \ac{mptcp} has several design goals, outlined in \cite{rfc6182}. At a high
 level, it aims to use the existence of multiple paths to improve efficiency and
-resiliency of standard TCP. Other transport protocols support this, such as SCTP
-with Concurrent Multipath Transfer \cite{iyengar2006concurrent}. However, SCTP
-cannot easily be used as a replacement for TCP, because applications would
-require modification, and some \acp{nat} and firewalls do not support SCTP
-\cite{barre2011multipath}. In contrast, \ac{mptcp} also aims to be compatible
-with the Internet today, so it can be deployed widely.
+resiliency of standard TCP. Other transport protocols support similar high-level
+goals, such as SCTP with Concurrent Multipath Transfer
+\cite{iyengar2006concurrent}. However, SCTP cannot easily be used as a
+replacement for TCP, because applications require modification to use SCTP, and
+some \acp{nat} and firewalls do not support SCTP \cite{barre2011multipath}. In
+contrast, \ac{mptcp} aims to be compatible with unmodified applications and
+common Internet middleboxes, so it can be deployed widely.
 
 \ac{mptcp}'s design focuses on two types of compatibility, which motivate many
 of its high-level design decisions. First, application compatibility: \ac{mptcp}
@@ -349,17 +353,22 @@ following types of disruption by middleboxes \cite{rfc6182}:
 
 \begin{itemize}
 \item Home routers often perform \ac{nat}, and so addresses may not be the same
-  on either side of a connection.
+  on either side of a connection \cite{rfc3022}.
 \item Some \ac{nat} boxes will additionally rewrite content of some protocols,
   such as URLs in HTTP \cite{rfc6182} and IP addresses and ports in FTP
   \cite{raiciu2012hard}.
-\item Some middleboxes perform sequence number randomization.
-\item Some middleboxes strip unrecognized options from packets.
+\item Some middleboxes perform sequence number randomization
+  \cite{hesmans2013tcp,medina2005measuring}.
+\item Some middleboxes strip IP and TCP options from packets, although TCP
+  options are more commonly respected \cite{medina2005measuring}.
 \item Some middleboxes (especially traffic normalizers) will not allow ``holes''
-  in TCP sequence numbers.
-\item TCP segments may be broken up (for example, segmentation offload) or
-  coalesced. TCP options on these segments must be constructed in a way that
-  this process will not make the data uninterpretable.
+  in TCP sequence numbers \cite{hesmans2013tcp}. That is, some middleboxes
+  expect to see all data segments which have been acknowledged.
+\item TCP segments may be broken up or coalesced \cite{hesmans2013tcp}. For
+  example, TCP Segmentation Offload is a feature supported by some NICs, which
+  advertises a large MSS value to the TCP stack, and then splits large segments
+  into smaller ones in hardware. TCP options on these segments must be
+  constructed in a way that this process will not make the data uninterpretable.
 \end{itemize}
 
 Finally, an additional network compatibility requirement is that \acl{mptcp}
@@ -376,55 +385,55 @@ thesis (such as \ac{nat}) to extend it in new ways.
 
 \begin{figure}[h]
   \centering
-\begin{BVerbatim}
-                             +-------------------------------+
-                             |           Application         |
-+---------------+            +-------------------------------+
-|  Application  |            |             MPTCP             |
-+---------------+            + - - - - - - - + - - - - - - - +
-|      TCP      |            | Subflow (TCP) | Subflow (TCP) |
-+---------------+            +-------------------------------+
-|      IP       |            |       IP      |      IP       |
-+---------------+            +-------------------------------+
-\end{BVerbatim}
+  \begin{multicols}{2}
+    \begin{bytefield}{16}
+      \wordbox{1}{Application} \\
+      \wordbox{1}{TCP} \\
+      \wordbox{1}{IP}
+    \end{bytefield}
+    \begin{bytefield}[bitwidth=1.1em]{16}
+      \wordbox{1}{Application} \\
+      \wordbox{1}{MPTCP} \\
+      \bitbox{8}{Subflow (TCP)} & \bitbox{8}{Subflow (TCP)} \\
+      \bitbox{8}{IP} & \bitbox{8}{IP}
+    \end{bytefield}
+  \end{multicols}
 \caption[Comparison of TCP and \acs{mptcp} Protocol Stacks]{Comparison of
   Standard TCP and \ac{mptcp} Protocol Stacks. Originally from \cite{rfc6824}}
   \label{fig:layers}
 \end{figure}
 
-To achieve these goals, \ac{mptcp} is located between TCP and the application
-layer, as shown in Figure~\ref{fig:layers}. While a naive approach would simply
-send different segments on different paths, this would create ``sequence
-number holes'' from the perspective of middleboxes \cite{raiciu2012hard}. To
-remain compatible, a ``subflow'' is created along each path. Each subflow looks
-like a normal TCP connection, but with some additional options, and slightly
-different semantics.
+To achieve the goals described in Section~\ref{sec:mptcp-design}, \ac{mptcp} is
+located between TCP and the application layer, as shown in
+Figure~\ref{fig:layers}. TCP ``subflows'' are created along every path. Each
+subflow looks like a normal TCP connection, but with some additional options,
+and slightly different semantics.
 
-A \ac{mptcp} connection begins with a three-way handshake, similar to a regular
+An \ac{mptcp} connection begins with a three-way handshake, similar to a regular
 TCP connection. If both hosts are capable and willing to use \ac{mptcp}, they
-include a TCP option with subtype \texttt{MP\_CAPABLE} on all packets of the
-handshake. Additional TCP connections (referred to as ``subflows'') may be
-created between the two hosts once the initial one is established, using the
-\ac{mptcp} option subtype \texttt{MP\_JOIN}. To authenticate this process, keys
-are exchanged via the \texttt{MP\_CAPABLE} option, and a token is verified using
-these keys for each new subflow via the \texttt{MP\_JOIN} option.
+include a TCP option with bype \texttt{MP\_CAPABLE} on all packets of the
+handshake. Additional TCP connections may be created between the two hosts once
+the initial connection is established, using the \ac{mptcp} option type
+\texttt{MP\_JOIN}. To authenticate this process, keys are exchanged via the
+\texttt{MP\_CAPABLE} option, and a token is verified using these keys for each
+new subflow via the \texttt{MP\_JOIN} option.
 
 Either side of an \ac{mptcp} connection may establish a new subflow with its
 peer at any time according to local policy. However, sometimes this may not be
 possible, due to the presence of a firewall. \ac{mptcp} allows for a peer to
-advertise the existence of an address, without creating a subflow. This is
+advertise the existence of an IP address, without creating a subflow. This is
 achieved via the option \texttt{ADD\_ADDR}. Advertised addresses may be removed
 with the \texttt{REMOVE\_ADDR} option. Neither option is acknowledged, so
 delivery of the option is not guaranteed.
 
 Data has sequence numbers at both the subflow level and at the connection level.
-Each subflow has a \ac{dss} negotiated via the \ac{mptcp} option subtype
+Each subflow has a \ac{dss} negotiated via the \ac{mptcp} option type
 \texttt{DSS}, which maps subflow sequence numbers to data sequence numbers.
 These mappings are valid for only a certain amount of bytes, and thus new
 mappings must be transmitted periodically. As a result, the \ac{dss} is one
-persistent form of overhead in the protocol header. Data is acknowledged both
-at the subflow level (via the \texttt{ACK} flag), and at the data level (via a
-flag within the \ac{dss}).
+persistent form of overhead in the protocol header. Data is acknowledged both at
+the subflow level (via the acknowledgment flag and field), and at the data level
+(via a flag and field within the \ac{dss}).
 
 \subsection{Implementation}
 
@@ -445,13 +454,15 @@ have been proposed, to mitigate problems such as head-of-line blocking and
 bufferbloat \cite{paasch2014experimental}. In this thesis, we consider only the
 Lowest \ac{rtt} First scheduler.
 
-As with regular TCP congestion control, \ac{mptcp} congestion control is
-implemented as a modular component of the Linux kernel. While normal TCP
-congestion control algorithms (such as the Linux default, CUBIC) may be used on
-each subflow, several \ac{mptcp} specific implementations are provided: \ac{lia}
-\cite{rfc6356}, \ac{olia} \cite{draft-olia}, \ac{wvegas} \cite{draft-wvegas},
-and \ac{balia} \cite{draft-balia}. In this thesis, we only consider \ac{lia}
-congestion control.
+As with regular TCP congestion control \cite{rfc5681}, \ac{mptcp} congestion
+control is implemented as a modular component of the Linux kernel. While normal
+TCP congestion control algorithms (such as the Linux default, CUBIC
+\cite{ha2008cubic}) may be used on each subflow, several \ac{mptcp} specific
+implementations are provided: \ac{lia} \cite{rfc6356}, \ac{olia}
+\cite{draft-olia}, \ac{wvegas} \cite{draft-wvegas}, and \ac{balia}
+\cite{draft-balia}. In this thesis, we only consider \ac{lia} congestion
+control, as it is the default implementation, and currently is the recommended
+safe congestion control in the \ac{mptcp} specification \cite{rfc6824}.
 
 In order to decide when to create and destroy new subflows, as well as advertise
 alternative addresses, the Linux implementation uses another modular component
@@ -459,10 +470,10 @@ called a ``path manager'' \cite{mptcp}. The default implementation does nothing
 (except accepting incoming connections). The Linux implementation also includes
 an \texttt{ndiffports} path manager, which initiates up to $N$ subflows with a
 server, from different TCP source ports. This path manager can be useful for
-\ac{ecmp}, which will be discussed shortly. A \texttt{fullmesh} path manager
-establishes subflows between every pair of client addresses and advertised
-server addresses. A major part of the implementation of this thesis is a path
-manager for the Linux kernel \ac{mptcp} implementation.
+\ac{ecmp}, as we discuss in Section~\ref{sec:ecmp}. A \texttt{fullmesh} path
+manager establishes subflows between every pair of client addresses and
+advertised server addresses. A major part of the implementation of this thesis
+is a path manager for the Linux kernel \ac{mptcp} implementation.
 
 % Netfilter and Netlink?
 % OpenVPN?
@@ -492,13 +503,14 @@ PID namespaces give a group of applications a new set of process identifiers,
 starting from 1. Similarly, network namespaces group the resources of the
 operating system network stack. In particular, network namespaces group network
 interfaces, as well as routing tables and firewall rules. Kernel namespaces are
-the foundation of modern lightweight virtualization tools such as Docker.
+the foundation of modern lightweight virtualization tools such as Docker
+\cite{merkel2014docker}.
 
 Network namespaces may be connected by virtual Ethernet pairs, such that traffic
 sent on a virtual interface on within one namespace can be received on a virtual
 interface within another. Furthermore, these virtual Ethernet links may be
 configured using the Linux Traffic Control framework, to emulate packet loss,
-latency, jitter, reordering, retransmission, and control link bandwidth.
+latency, jitter, reordering, packet duplication, and control link bandwidth.
 
 Mininet creates virtual networks via the following mechanism
 \cite{lantz2010network}. Each host is a shell process running within a separate
@@ -512,9 +524,11 @@ It is more lightweight than virtual machines, enabling practical experimentation
 on single machines. It provides an easy-to-use Python API, reducing manual
 interaction in the experimentation process. By providing complete virtual
 machine images with Mininet and experiments pre-installed, experiments may be
-made completely reproducible, and distributed easily online. Finally, as
-compared to larger, hardware based emulation frameworks such as EmuLab, the
-development time and debugging time can be dramatically reduced when developing
+made completely reproducible, and distributed easily online \footnote{Virtual
+  machine images and data for our experiments will be made available at:
+  \url{https://brennan.io/thesis}}. Finally, as compared to larger, hardware
+based emulation frameworks such as EmuLab\cite{hibler2008large}, the development
+time and debugging time can be dramatically reduced when constructing
 experiments.
 
 \chapter{Related Work}
@@ -665,6 +679,7 @@ redundancy. However, transport-layer systems based on overlay networks have been
 created which do so (see Section~\ref{s:rw-transport}).
 
 \subsection{Equal Cost Multi-path Routing}
+\label{sec:ecmp}
 
 The \ac{mptcp} protocol specification allows for subflows to be established
 between the same two IP addresses as a pre-existing subflow in a connection,
@@ -1068,15 +1083,12 @@ shown in Figure~\ref{fig:udp-nat-packet}.
 
 \begin{figure}
   \centering
-\begin{BVerbatim}
-+-----------------------------------+
-| ver(1) | op(1)  | reserved (2)    |
-+-----------------------------------+
-|           rip (4 bytes)           |
-+-----------------------------------+
-| rpt (2 bytes)   | dpt (2 bytes)   |
-+-----------------|-----------------+
-\end{BVerbatim}
+  \begin{bytefield}[bitwidth=0.6em]{32}
+    \bitheader{0,7,8,15,16,23,24,31}\\
+    \bitbox{8}{\texttt{ver}} & \bitbox{8}{\texttt{op}} & \bitbox{16}{\texttt{reserved}} \\
+    \wordbox{1}{\texttt{rip}} \\
+    \bitbox{16}{\texttt{rpt}} & \bitbox{16}{\texttt{dpt}} \\
+  \end{bytefield}
   \caption{UDP \ac{nat} tunnel request structure}
   \label{fig:udp-nat-packet}
 \end{figure}
