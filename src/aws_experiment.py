@@ -88,7 +88,7 @@ CREATE_INSTANCES_PARAMS = {
     'MinCount': 1,
     'MaxCount': 1,
     'UserData': open(SETUP_SCRIPT).read(),
-    'InstanceType': 't2.micro',
+    'InstanceType': 'm4.large',
     'TagSpecifications': [
         {
             'ResourceType': 'instance',
