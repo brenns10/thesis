@@ -17,14 +17,13 @@ Prerequisites:
    programmatically.
 
 """
-import collections
 import os
+import re
 import sys
 from io import BytesIO
 from os.path import abspath
 from os.path import dirname
 from os.path import join
-from pprint import pprint
 
 import boto3
 import paramiko
@@ -58,6 +57,7 @@ KEYFILE = os.getenv('KEYFILE') or '/home/stephen/.ssh/id_rsa'
 
 # The filename of the AWS setup script.
 SETUP_SCRIPT = join(dirname(abspath(__file__)), '../etc/aws_exp_setup.sh')
+SETUP_SCRIPT_VANILLA = join(dirname(abspath(__file__)), '../etc/aws_exp_setup_vanilla.sh')
 
 # These tags are applied to everything we create, so it's easier to clean up
 # via the Console if things go wrong.
@@ -133,22 +133,23 @@ def merge(d1, d2):
 
 def resource_params(k):
     v = merge(RESOURCE_PARAMS, RESOURCE_PARAMS_EACH[k])
-    #pprint(v)
     return v
 
 
 def create_instances_params(k):
     v = merge(CREATE_INSTANCES_PARAMS, CREATE_INSTANCES_PARAMS_EACH[k])
-    #pprint(v)
     return v
 
 
-def create_instances():
+def create_instances(vanilla=False):
     instances = {}
     for k in RESOURCE_PARAMS_EACH.keys():
         print('Creating instance %s...' % k)
         resource = boto3.resource('ec2', **resource_params(k))
-        instance = resource.create_instances(**create_instances_params(k))
+        params = create_instances_params(k)
+        if vanilla:
+            params['UserData'] = open(SETUP_SCRIPT_VANILLA).read()
+        instance = resource.create_instances(**params)
         assert len(instance) == 1
         instances[k] = instance[0]
     return instances
@@ -201,14 +202,15 @@ def ssh_connect(instances):
     return clients
 
 
-def many_iperf(n, client_transport, server_chan, server_output, instances):
+def many_iperf(n, client_transport, server_chan, server_output, instances, addr=None):
     print('IPERF: ', end='')
     sys.stdout.flush()
+    if addr is None:
+        addr = instances['server'].public_ip_address
     for _ in range(n):
         client_chan = client_transport.open_session()
         client_chan.set_combine_stderr(True)
-        client_chan.exec_command(command='iperf3 -c %s -J' %
-                                 instances['server'].public_ip_address)
+        client_chan.exec_command(command='iperf3 -c %s -J' % addr)
         print('<', end='')
         sys.stdout.flush()
         while not client_chan.exit_status_ready():
@@ -232,35 +234,47 @@ def blocking_cmd(ssh, cmd):
     chan.recv_exit_status()
 
 
-def run_exp_nat(instances, clients):
+def long_running_cmd(ssh, cmd):
+    chan = ssh.open_session()
+    chan.set_combine_stderr(True)
+    chan.exec_command(command=cmd)
+    return chan
+
+
+def run_exp_mptcp(instances, clients):
+    """Runs the AWS experiment, given dict containing AWS instances, and a dict
+    containing Paramiko SSH connections to each one.
+
+    You might say this experiment script is hacky, and you would be right. We
+    do the experiments in order: first, do control, with one subflow. Then, add
+    a NAT detour and use that. Then remove the NAT detour and use a VPN detour.
+    The detour daemons can both be run simultaneously with no problems, and
+    that's just what we do.
+
+    """
     detour_transport = clients['detour'].get_transport()
     client_transport = clients['client'].get_transport()
     server_transport = clients['server'].get_transport()
 
-    # start detour daemon
+    # start detour daemons
     print('Starting detour nat daemon...')
-    detour_chan = detour_transport.open_session()
-    detour_chan.set_combine_stderr(True)
-    detour_chan.exec_command(command='cd src; sudo ./nat_detour.py')
+    detour_chan = long_running_cmd(detour_transport, 'cd src; sudo ./nat_detour.py')
     print(detour_chan.recv(4096))
+
     print('Starting detour vpn daemon...')
-    detour_vpn_chan = detour_transport.open_session()
-    detour_vpn_chan.set_combine_stderr(True)
-    detour_vpn_chan.exec_command(command='cd src; sudo ./vpn_detour.sh')
+    detour_vpn_chan = long_running_cmd(detour_transport, 'cd src; sudo ./vpn_detour.sh')
     print(detour_vpn_chan.recv(4096))
 
     # start server
     print('Starting iperf server...')
-    server_chan = server_transport.open_session()
-    server_chan.set_combine_stderr(True)
-    server_chan.exec_command(command='iperf3 -s -J')
+    server_chan = long_running_cmd(server_transport, 'iperf3 -s -J')
 
     # run iperf several times, recv()ing server output
     server_output = BytesIO()
     many_iperf(TRIALS, client_transport, server_chan, server_output, instances)
 
     # save control server output
-    with open('server.ctrl.json', 'wb') as f:
+    with open('server.ctrl.mptcp.json', 'wb') as f:
         f.write(server_output.getvalue())
 
     # send a client daemon config
@@ -276,43 +290,136 @@ def run_exp_nat(instances, clients):
 
     # run the client daemon
     print('Starting up the nat daemon...')
-    client_daemon_chan = client_transport.open_session()
-    client_daemon_chan.get_pty() # so we can SIGHUP it
-    client_daemon_chan.set_combine_stderr(True)
-    client_daemon_chan.exec_command(
-        command='cd src; sudo ./client daemon ../etc/daemon-nat-aws.conf'
+    client_daemon_chan = long_running_cmd(
+        client_transport,
+        'cd src; sudo ./client daemon ../etc/daemon-nat-aws.conf',
     )
 
+    # run nat trials
     server_output = BytesIO()
     many_iperf(TRIALS, client_transport, server_chan, server_output, instances)
 
     # save nat server output
-    with open('server.nat.json', 'wb') as f:
+    with open('server.nat.mptcp.json', 'wb') as f:
         f.write(server_output.getvalue())
 
-    # this should close the client daemon, but apparently it doesn't
-    client_daemon_chan.send('\x03') # sigint
-    client_daemon_chan.close()
-
+    # kill nat client daemon
     print('Killing daemon...')
     blocking_cmd(client_transport, "sudo pkill -f '^./client daemon'")
+
+    # remove the NAT entry so that the vpn one will be used. not strictly
+    # necessary because the vpn should be preferred, but it makes me feel
+    # better.
     print('Cleaning up NAT entry...')
     blocking_cmd(client_transport, 'cd src; sudo ./client del %s %d %s %d' %
                  (instances['detour'].public_ip_address, 5201,
                   instances['server'].public_ip_address, 5201))
 
+    # start vpn client daemon
     print('Starting up the openvpn daemon...')
-    client_daemon_chan = client_transport.open_session()
-    client_daemon_chan.set_combine_stderr(True)
-    client_daemon_chan.exec_command(
-        command='cd src; sudo ./client daemon ../etc/daemon-vpn-aws.conf'
+    client_daemon_chan = long_running_cmd(
+        client_transport,
+        'cd src; sudo ./client daemon ../etc/daemon-vpn-aws.conf',
     )
 
+    # save vpn server output
     server_output = BytesIO()
     many_iperf(TRIALS, client_transport, server_chan, server_output, instances)
 
     # save vpn output
-    with open('server.vpn.json', 'wb') as f:
+    with open('server.vpn.mptcp.json', 'wb') as f:
+        f.write(server_output.getvalue())
+
+    clients['detour'].close()
+    clients['server'].close()
+    clients['client'].close()
+
+
+def run_exp_vanilla(instances, clients):
+    """Runs the AWS experiment with vanilla TCP, given dict containing AWS
+    instances, and a dict containing Paramiko SSH connections to each one.
+
+    You might say this experiment script is hacky, and you would be right. We
+    do the experiments in order: first, do control - TCP across default route.
+    Then, add a NAT detour and use that. Then remove the NAT detour and use a
+    VPN detour. The detour daemons can both be run simultaneously with no
+    problems, and that's just what we do.
+
+    """
+    detour_transport = clients['detour'].get_transport()
+    client_transport = clients['client'].get_transport()
+    server_transport = clients['server'].get_transport()
+
+    # start detour daemons
+    print('Starting detour nat daemon...')
+    detour_chan = long_running_cmd(detour_transport, 'cd src; sudo ./nat_detour.py')
+    print(detour_chan.recv(4096))
+
+    print('Starting detour vpn daemon...')
+    detour_vpn_chan = long_running_cmd(detour_transport, 'cd src; sudo ./vpn_detour.sh')
+    print(detour_vpn_chan.recv(4096))
+
+    # start server
+    print('Starting iperf server...')
+    server_chan = long_running_cmd(server_transport, 'iperf3 -s -J')
+
+    # run iperf several times, recv()ing server output
+    server_output = BytesIO()
+    many_iperf(TRIALS, client_transport, server_chan, server_output, instances)
+
+    # save control server output
+    with open('server.ctrl.vanilla.json', 'wb') as f:
+        f.write(server_output.getvalue())
+
+    # setup a nat entry
+    print('Manually creating a NAT detour...')
+    detour_ip = instances['detour'].public_ip_address
+    server_ip = instances['server'].public_ip_address
+    port = '5201'
+    blocking_cmd(client_transport, 'src/request.py %s %s %s %s' % (
+        detour_ip, server_ip, port, port))
+
+    # run nat trials, but use the detour IP rather than the server
+    server_output = BytesIO()
+    many_iperf(TRIALS, client_transport, server_chan, server_output, instances,
+               addr=detour_ip)
+
+    # save nat server output
+    with open('server.nat.vanilla.json', 'wb') as f:
+        f.write(server_output.getvalue())
+
+    # start vpn client daemon
+    print('Starting up the openvpn daemon...')
+    client_daemon_chan = long_running_cmd(
+        client_transport,
+        'sudo openvpn --remote %s 1194 udp --client --dev tun '
+        '--ca ../tmp/ca.crt --cert ../tmp/client1.crt '
+        '--key ../tmp/client1.key ' '--topology p2p --pull '
+        '--nobind &' % detour_ip,
+    )
+
+    print('Waiting for OpenVPN peer address')
+    # We need to wait until the openvpn interface is up. This will also
+    # give us the peer IP address, which we already configured, but it's
+    # always better to dynamically determine.
+    output = client_daemon_chan.recv(4096)
+    regexp = re.compile(r'ip addr add dev tun0 local ([0-9.]+) peer ([0-9.]+)')
+    while not regexp.search(output):
+        output += client_daemon_chan.recv(4096)
+    match = regexp.search(output)
+    local, peer = match.groups()
+
+    # Now we configure a specific route so that iperf traffic goes through
+    # OpenVPN.
+    print('Setting OpenVPN routing rule...')
+    blocking_cmd('sudo route add -host %s gw %s' % (server_ip, peer))
+
+    # do vpn trials
+    server_output = BytesIO()
+    many_iperf(TRIALS, client_transport, server_chan, server_output, instances)
+
+    # save vpn output
+    with open('server.vpn.vanilla.json', 'wb') as f:
         f.write(server_output.getvalue())
 
     clients['detour'].close()
@@ -332,19 +439,26 @@ def cleanup():
         ec2.instances.filter(Filters=TAG_FILTER).terminate()
 
 
-def main():
-    instances = create_instances()
-    first_time_wait(instances)
-    clients = ssh_connect(instances)
-    run_exp_nat(instances, clients)
-    print('Opening ipdb... When you exit, we\'re done here.')
-    import ipdb; ipdb.set_trace()
-    terminate_all(instances)
+def main(vanilla=False):
+    try:
+        instances = create_instances(vanilla)
+        first_time_wait(instances)
+        clients = ssh_connect(instances)
+        if vanilla:
+            run_exp_vanilla(instances, clients)
+        else:
+            run_exp_mptcp(instances, clients)
 
+    finally:
+        print('Opening ipdb... When you exit, we\'re done here.')
+        import ipdb; ipdb.set_trace()
+        terminate_all(instances)
 
 
 if __name__ == '__main__':
     if len(sys.argv) > 1 and sys.argv[1] == 'cleanup':
         cleanup()
+    elif len(sys.argv) > 1 and sys.argv[1] == 'vanilla':
+        main(True)
     else:
-        main()
+        main(False)

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Run as root. Activates MPTCP kernel.
+# Run as root. Does not activate MPTCP kernel.
 cd
 
 export DEBIAN_FRONTEND=noninteractive
@@ -21,14 +21,8 @@ echo Installing required packages...
 apt install -y -q build-essential python3-pip libnl-genl-3-dev openvpn iperf3 tmux libconfig-dev
 echo Installing Python packages...
 pip3 install psutil
-echo Installing custom kernel...
-dpkg -i ~ubuntu/tmp/*.deb
 
-echo Setting default kernel...
-SUBMENU=$(egrep -o -m 1 "gnulinux-advanced[0-9a-zA-Z-]+" /boot/grub/grub.cfg)
-BOOT_OPTION=$(egrep -o -m 1 "gnulinux-4.1.38-custom-advanced[0-9a-zA-Z-]+" /boot/grub/grub.cfg)
-sed -i.bak "s/#\?GRUB_DEFAULT.*/GRUB_DEFAULT=\"$SUBMENU>$BOOT_OPTION\"/g" /etc/default/grub
-update-grub
+echo Not bothering with the MPTCP kernel, have fun with vanilla TCP
 
 echo Building tools...
 sudo -u ubuntu make -C ~ubuntu/src clean
@@ -36,9 +30,6 @@ sudo -u ubuntu make -C ~ubuntu/src all
 
 echo Adding ssh keys...
 echo "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDEupr15Lbq8jFBca/tXhydvD2nKQ/vWnxXzOndG7TqKGy53mtlgR6VzaV4WR3blrLdDG223a64VlQaj00xm+8e/eAn+IRH3RpV2ZvFT+BdZmej8E4y0sSlkiCw2sjtyKiGu0Pyk2HKbA8njG+aVsJ5YSQVwBBP1nEqKoMItvXzZwQJQ09SCeklT5zugcJz+frGFifjz1I6bs7Hb9vNa7hNi79JjJ1rNoeANkBmunW20+M7hMOuNjGWl47XGDlew7tn3vc2Eiiohf0cyrueBPq63Y7tMEfhmyCEPfakkjg5idt3soRGKCBqyoVuYyEIOJSTnuGBkThZteGHLlpKvMVz stephen@greed_2013-09-26" >> ~ubuntu/.ssh/authorized_keys
-
-echo Setting congestion control to lia
-sysctl -w net.ipv4.tcp_congestion_control=lia
 
 echo Completed successfully! Shutting down...
 shutdown -h now
