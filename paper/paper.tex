@@ -717,6 +717,8 @@ system does. Finally, Binder is a system which operates at a network gateway,
 while ours operates on a client host itself.
 
 \section{Transport Layer}
+
+\subsection{mTCP}
 \label{s:rw-transport}
 
 \ac{mptcp}, the heart of our mechanism, is at the transport layer. It is built
@@ -830,8 +832,32 @@ layer design limits the scope of their utility.
 
 \subsection{HTTP Range Requests}
 
-hi
+\ac{http} is a ubiquitous application layer protocol for accessing web pages.
+HTTP 1.1 \cite{rfc2616}, contains an optional feature known as range requests
+\cite{rfc7233} which allow a client to request a byte range of a file. This
+allows clients to resume interrupted transfers or to retrieve partial contents,
+such as a page from a larger document.
 
+Kaspar \textit{et al.} \cite{kaspar2010enhancing} describe the use of \ac{http}
+range requests to download large files over multiple wireless interfaces. Their
+mechanism requests separate ranges on each wireless interface and reassembles
+them locally. Their mechanism focuses on live media playback, and so it seeks to
+minimize start-up time while aggregating throughput. However, their mechanism is
+applicable to regular \ac{http} downloads as well.
+
+Similar to peer to peer networks, this approach cannot be generalized to other
+applications. However, \ac{http} is a very common protocol, and a bandwidth
+aggregation approach for \ac{http} could be very widely applicable.
+Unfortunately, Kaspar \textit{et al.}'s approach only makes use of multiple
+network interfaces as sources of alternative routes, similar to plain
+\ac{mptcp}. Their mechanism could be extended to use detour routes, provided
+that detours run \ac{http} proxies which support range requests. However, our
+mechanism is also capable of using detour routing to provide alternative routes.
+Being based on TCP, it is directly applicable to \ac{http}. By operating at the
+transport layer, our mechanism is capable of much more fine-grained data
+striping. Further, our mechanism could be applied to pipelined sessions
+containing small files, while Kaspar \textit{et al.}'s approach is limited to
+large files.
 
 \chapter{Implementation}
 \label{c:impl}
