@@ -37,15 +37,18 @@ SCEN = {
 
 
 def make_single_plot(base):
-    print(base)
     data = []
     labels = []
+    text = META[base]
     for s, label in SCEN.items():
-        data.append(o.get_numpy_array('%s.%s.json' % (base, s)) / 1000000)
+        arr = o.get_numpy_array('%s.%s.json' % (base, s)) / 1000000
+        data.append(arr)
+        text += ' & %.2f (%.2f)' % (arr.mean(), arr.std())
         labels.append(label)
 
+    print(text + r' \\')
+
     fig, ax = plt.subplots()
-    print(list(map(len, data)))
     ax.boxplot(data, labels=labels)
     ax.set_ylabel('Throughput (Mbps)')
     ax.set_title('Throughput Comparison: ' + META[base])
@@ -53,6 +56,10 @@ def make_single_plot(base):
 
 
 def make_all_plots():
+    title = ''
+    for v in SCEN.values():
+        title += r' & \textbf{%s}' % v
+    print(title + r'\\')
     for base in META.keys():
         make_single_plot(base)
 
