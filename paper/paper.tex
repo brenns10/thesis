@@ -52,7 +52,7 @@
 }
 \DeclareAcronym{ron}{
   short = RON,
-  long  = Resilient Overlay Network
+  long  = Resilient Overlay Networks
 }
 \DeclareAcronym{lsrr}{
   short = LSRR,
@@ -97,6 +97,10 @@
 \DeclareAcronym{rtt}{
   short = RTT,
   long  = Round Trip Time
+}
+\DeclareAcronym{http}{
+  short = HTTP,
+  long  = Hypertext Transfer Protocol
 }
 
 \begin{document}
@@ -536,16 +540,24 @@ access points, allows neighboring residential access points to share bandwidth.
 Each router negotiates a connection with its neighboring access points, and uses
 round-robin scheduling to assign packet flows to different gateways. Streams,
 like TCP, must remain on the gateway that their initial packet used, so the
-system does not truly aggregate bandwidth for streams. The authors considered
-implementing a \ac{mptcp} proxy with subflows over each gateway, but rejected
-this strategy since it required an egress point on the wide area Internet.
+system does not truly aggregate bandwidth for streams, but instead
+load-balances. The authors considered implementing a \ac{mptcp} proxy with
+subflows over each gateway, but rejected this strategy since it required an
+egress point on the wide area Internet \cite{radio-agg}.
+
+In the case of link layer approaches to bandwidth aggregation, most mechanisms
+are highly localized. Channel bonding approaches are limited to multiple links
+between the same endpoints, and these links require identical hardware
+\cite{chiussi1998generalized}. Beyond One's Bandwidth is only applicable to
+wireless access points within range of each other. Our mechanism allows
+bandwidth aggregation across entire paths, not simply nearby links.
 
 \section{Network Layer}
 
 Improved Internet routing has been a goal for researchers for a long time, and
-the network layer has been a natural place to begin. Related work on the network
-includes source routing, overlay routing schemes, and several multipath routing
-approaches.
+the network layer has been a natural place to begin. Related work includes
+source routing, overlay routing schemes, and several improved routing
+approaches, many of which involve multipath routing.
 
 \subsection{Source Routing}
 
@@ -555,18 +567,31 @@ to its final destination. Although packets are normally routed on the Internet
 hop-by-hop, there are mechanisms for specifying the path that a packet should
 take. In IPv4, these mechanisms are the options \ac{lsrr} and \ac{ssrr}
 \cite{rfc791}. These IP options allow the source of a packet to specify a
-partial (Loose) or complete (Strict) route consisting of a list of addresses. In
-IPv6, a similar mechanism called Segment Routing is being proposed by the IPv6
-Maintenance Working Group of the IETF \cite{draft-segment-routing}. Options like
-these are most useful within a single managed network, since they are not
-respected on the wide area Internet, due to the potential for spoofing IP
-addresses while still receiving reply packets.
+partial (Loose) or complete (Strict) route consisting of a list of addresses.
+The route taken is recorded within the packet, and reply packets must follow the
+same route. In IPv6, a similar mechanism called Segment Routing is being
+proposed by the IPv6 Maintenance Working Group of the IETF
+\cite{draft-segment-routing}.
+
+Source routing options are considered insecure. If source routing options were
+respected, an attacker could send a packet with a complete route specified,
+while spoofing the source address. Reply packets would follow the recorded route
+in reverse back to the attacker \cite{bellovin1989security}. This behavior would
+allow complete spoofing of source addresses, including receiving reply packets.
+Furthermore, maliciously crafted source routes can be used to create bandwidth
+exhaustion attacks and evade firewalls \cite{rfc7126}. As a result, it is
+recommended that routers and firewalls drop packets bearing these options, and
+many routers on the Internet do \cite{rfc7126}.
+
+Detour routing is simply one-hop source routing. If source routing options were
+widely supported on the Internet, our mechanism might be able to use them to
+route subflows across detours. Such an implementation would require no
+modification of a detour host. However, the security implications of source
+routing on the Internet heavily outweigh their potential benefits. As a result,
+we must resort to other mechanisms to perform the same function as source
+routing, such as tunneling and \ac{nat}.
 
 \subsection{Overlay Routing}
-
-Beyond Source Routing, there are no mechanisms to experiment with how routers
-work on the Internet. As the IPv6 deployment process has demonstrated, network
-layer protocols are not easy to change.
 
 An alternative to designing and deploying a full new network layer protocol is
 experimenting on overlay networks. Overlay networks are networks constructed on
@@ -585,8 +610,8 @@ not support it. Later approaches, such as Overcast \cite{jannotti2000overcast},
 apply the concept of overlay networking at the application level to achieve
 similar results.
 
-In \cite{ron}, Andersen \textit{et al.} described \ac{ron}, a framework for
-creating overlay networks and routing traffic along them. Applications link to a
+Andersen \textit{et al.}~\cite{ron} describe \ac{ron}, a framework for creating
+overlay networks and routing traffic along them. Applications link to a
 user-space library, and access the network via a \texttt{send} function and a
 \texttt{recv} callback. Applications may choose to send via the default Internet
 routed path, or via the overlay. Routing is performed at each node, rather than
@@ -597,9 +622,9 @@ database.
 The design goal of \ac{ron} is to improve reliability by using overlays. The
 result also showed that latency and throughput could be improved via overlays.
 However, as an application-level approach, \ac{ron} cannot be applied to
-unmodified applications. In \cite{andersen2003best}, Andersen \textit{et al.}
-later described a redundant routing scheme in which redundant copies of packets
-are sent along multiple paths. They compared this approach with a more
+unmodified applications. Andersen \textit{et al.} later described a redundant
+routing scheme in which redundant copies of packets are sent along multiple
+paths \cite{andersen2003best}. They compared this approach with a more
 traditional approach that reacts to link failures and routes around them,
 similar to the \ac{ron} framework's original routing system. However, they did
 not attempt to use multiple paths without redundancy, since their study focused
@@ -610,10 +635,12 @@ inspired approach to multi-path routing \cite{leibnitz2006biologically}. Their
 mechanism discovers routes via an iterative broadcasting method, not unlike the
 construction of a shortest path tree. When a selection of routes is ready, the
 mechanism moves into a route maintenance mode. A main route is selected, with
-alternative routes being used as backups. Based on changes in link state, as
-well as some degree of randomness, the main route may become backup, while a
-different route is selected as the main route. As a result, this mechanism does
-not appear to achieve a high degree of aggregation.
+alternative routes being used as backups. Packets are transmitted along the main
+route with a high probability, and along the backup routes with low probability.
+Based on changes in link state, as well as some degree of randomness, the main
+route may become backup, while a different route is selected as the main route.
+The authors do not measure bandwidth aggregation, as their main focus is
+resilience against link failures.
 
 Gummadi \textit{et al.} \cite{gummadi2004improving} demonstrated a simpler
 approach to detour routing. Rather than creating a full overlay network in which
@@ -644,12 +671,22 @@ routes between hosts. Routers in these topologies use \ac{ecmp} to choose
 between paths that have the same cost, by hashing the connection 5-tuple
 \cite{raiciu2011improving}. While normally, \ac{ecmp} provides load-balancing,
 it can be combined with \ac{mptcp} to provide bandwidth aggregation, since a
-subflow's different 5-tuple may result in a different route. In
-\cite{raiciu2011improving}, Raiciu \textit{et al.} describe in detail a
-simulation study that evaluates the performance of \ac{mptcp} on several data
-center topologies and congestion controls. They also describe a validation on an
-Amazon EC2 data center with a highly redundant topology, in which using
-\ac{mptcp} with four subflows achieved a 3x throughput improvement.
+subflow's different 5-tuple may result in a different route. Raiciu \textit{et
+  al.} \cite{raiciu2011improving} describe in detail a simulation study that
+evaluates the performance of \ac{mptcp} on several data center topologies and
+congestion controls. They also describe a validation on an Amazon EC2 data
+center with a highly redundant topology, in which using \ac{mptcp} with four
+subflows achieved a 3x throughput improvement.
+
+Similar to source routing, \ac{ecmp} offers the capability for the source of a
+packet to alter the route its packet takes. Unlike source routing, \ac{ecmp}
+gives only very loose control: by altering the source port (and thus the
+connection 5-tuple), a second TCP flow (or subflow) \textit{may} take a new
+route, but it may not. Using several subflows improves the probability of
+alternative routes being used. If \ac{ecmp} were common outside of datacenter
+networks, it would be possible to use separate source ports and obtain different
+routes for subflows, replacing our detour mechanisms. However, this is not
+currently possible on the Internet.
 
 \subsection{Binder}
 
@@ -674,7 +711,10 @@ Section~\ref{s:rw-ll}.
 Our mechanism also uses OpenVPN, as one of the two implementation alternatives
 for the detour. However, a key difference is that while Binder uses OpenVPN over
 \ac{mptcp}, we only put a single subflow of an \ac{mptcp} connection through
-OpenVPN, essentially leveraging OpenVPN for tunneling.
+OpenVPN, essentially leveraging OpenVPN for tunneling. Furthermore, while Binder
+enables bandwidth aggregation, it does not leverage source routing, as our
+system does. Finally, Binder is a system which operates at a network gateway,
+while ours operates on a client host itself.
 
 \section{Transport Layer}
 \label{s:rw-transport}
@@ -693,8 +733,9 @@ per-subflow, mTCP simply routes TCP segments across different paths. Congestion
 control is performed separately on each ``subflow'', while the receive window is
 global. Acknowledgements are transmitted on only one return path. Paths are
 dynamically added based on a heuristic that involves an estimated path
-disjointness metric based on traceroute and latency. Paths are suppressed when
-shared congestion is detected, and removed if they are detected to have failed.
+disjointness metric based on the measured route and path latency. Paths are
+suppressed when shared congestion is detected, and removed if they are detected
+to have failed.
 
 The mTCP mechanism is based on a user-space TCP implementation, and it uses
 \ac{ron} \cite{ron} as a network layer capable of providing multiple routes. By
@@ -709,16 +750,15 @@ as a more compatible and standards-based take on the concepts of mTCP. Our
 mechanism has the benefit of transparency to the application, and no dependence
 on \ac{ron}.
 
-\section{Application Layer}
+\subsection{MPTCP Proxying}
 
-At the application layer, a recent \ac{mptcp} IETF working group draft proposes
-a set of proxying mechanisms that allow ISPs to improve client TCP and
-\ac{mptcp} connection throughput \cite{boucadair-mptcp-plain-mode-10}. Based on
-observations that \ac{mptcp} server deployment has not been strong, these
-mechanisms expect a server and optionally a client which do not support
-\ac{mptcp}. They proxy traffic through \acp{mcp}, devices which ISPs deploy
-throughout the network. There are two possible deployment scenarios: one
-\ac{mcp} and two \ac{mcp}.
+A recent \ac{mptcp} IETF working group draft proposes a set of proxying
+mechanisms that allow ISPs to improve client TCP and \ac{mptcp} connection
+throughput \cite{boucadair-mptcp-plain-mode-10}. Based on observations that
+\ac{mptcp} server deployment has not been strong, these mechanisms expect a
+server and optionally a client which do not support \ac{mptcp}. They proxy
+traffic through \acp{mcp}, devices which ISPs deploy throughout the network.
+There are two possible deployment scenarios: one \ac{mcp} and two \ac{mcp}.
 
 In the one \ac{mcp} scenario, an \ac{mptcp}-enabled client would like to use
 \ac{mptcp} to connect to a server which does not support it. It establishes a
@@ -742,6 +782,56 @@ have no additional addresses to create new paths along. These approaches are not
 mutually exclusive. In fact, the one \ac{mcp} scenario could be used in
 conjunction with our mechanism to allow single-homed devices to gain the
 benefits of multiple paths, even when a server does not support \ac{mptcp}.
+
+\section{Application Layer}
+
+The application layer is well suited to allow experimentation, and is an
+excellent breeding ground for building new concepts. Applications may be
+modified and updated at a much quicker pace than the development of network and
+transport layer protocols can occur. As a result, the application layer
+demonstrates a diverse set of mechanisms for using multiple paths and
+aggregating bandwidth. We describe some of these mechanisms in this section.
+
+\subsection{Peer to Peer File Sharing}
+
+Peer to peer file sharing systems are typically distributed in their nature.
+Centralized systems require communication with a single server, and thus
+communication along only one path. An the other hand, peer to peer systems
+frequently involve communicating with several peers simultaneously, each one
+along a different path. As a result, peer to peer systems can enable bandwidth
+aggregation very naturally.
+
+An early peer to peer system, Gnutella \cite{adar2000free}, resembles an
+application-layer overlay network. Peers join the network by connecting to
+several well-known peers, and receiving information about other peers. They may
+then broadcast queries to peers, which are forwarded throughout the overlay
+network. Replies are forwarded along the reverse path, and contain information
+for peers to establish a direct connection, in order to exchange files. The
+actual file exchange is made directly between peers over \ac{http}, and thus is
+only a single-path exchange.
+
+Later systems, such as BitTorrent \cite{cohen2003incentives}, allow data to be
+exchanged via the overlay network itself, leveraging bandwidth aggregation. In
+BitTorrent, files are broken into small chunks which may be requested from any
+peer which has the chunk. Peers are incentivized to upload portions of the file
+which they possess because other peers will ``choke'' them (stop uploading to
+them) if the exchanges are not mutually beneficial. By communicating with
+multiple peers at a time, BitTorrent is capable of aggregating the bandwidth of
+several Internet paths.
+
+Both of these technologies, and many other peer to peer systems, enable powerful
+content distribution mechanisms, but are not ultimately applicable to other
+unmodified applications. Live streaming versions of BitTorrent exist, both in
+research \cite{mol2009design} and in commercial applications
+\cite{ruckert2014clubbing}. However, BitTorrent is not applicable to
+communications which do not involve swarms of users, such as video calling. In
+general, while peer to peer solutions can be very powerful, their application
+layer design limits the scope of their utility.
+
+\subsection{HTTP Range Requests}
+
+hi
+
 
 \chapter{Implementation}
 \label{c:impl}
