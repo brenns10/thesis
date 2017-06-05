@@ -35,8 +35,8 @@ Rehearsal Comments
     for a run of the mechanism (arrow showing request moving through, etc)
 - [x] Evaluation of the overhead?
 - [x] What is the workload in your experiments?
-- [ ] Detour collective - sharing economy?
+- [x] Detour collective - sharing economy?
 - [x] Related work - mention HTTP range requests and requesting embedded objects
   in parallel from different server replicas
-- [ ] (**Big One**) Use packet trace to see what fraction of data went along
+- [x] (**Big One**) Use packet trace to see what fraction of data went along
   each subflow.
