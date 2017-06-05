@@ -204,6 +204,8 @@
   \item Our concept is to use MPTCP to achieve detour routing in unmodified
     applications
   \item We use tunneling mechanisms to put a subflow across a detour host
+  \item Deployment scenario: friends with high bandwidth form a collective,
+    offer each other detouring services.
   \end{itemize}
 }
 
@@ -537,7 +539,6 @@
     \item Establish an OpenVPN connection with detour
     \item Send packets as normal through the virtual interface
     \item Packets encapsulated via OpenVPN protocol
-    \item Detour still performs NAT
     \end{itemize}
   \item NAT Approach
     \begin{itemize}
@@ -734,6 +735,7 @@
   \item This is network topology we us
   \item Has path diversity, a client, a server, a detour
   \item Each link has 5ms delay.
+  \item Core links red, access links blue
   \end{itemize}
 }
 
@@ -932,7 +934,7 @@
   \begin{itemize}
   \item Created a system for adding detour routes to MPTCP connections between
     single-homed devices.
-  \item Like MPTCP, this system works outside of experimental networks
+  \item Like MPTCP, this system works with unmodified applications
   \item System is capable of achieving similar performance to the best available
     path when no aggregation is possible
   \item System is capable of aggregating throughput when possible
