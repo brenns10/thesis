@@ -910,6 +910,7 @@
     regions
   \item Ran similar throughput measurements for MPTCP
   \item Performed at much higer level, but didn't show similar improvements
+  \item OpenVPN cannot sustain above 60Mbps in our setup
   \end{itemize}
 \end{frame}
 
@@ -917,17 +918,6 @@
 
 \section{Conclusion}
 \SectionHead{}{}
-
-\begin{frame}
-  \frametitle{Future Work}
-
-  \begin{itemize}
-  \item Deployment scenarios
-  \item Dynamic subflow addition and removal
-  \item Data scheduling
-  \item 0-RTT NAT establishment
-  \end{itemize}
-\end{frame}
 
 \begin{frame}
   \frametitle{Summary}
@@ -942,7 +932,18 @@
   \end{itemize}
 \end{frame}
 
-\appendix % slide numbering includes nothing after here
+\begin{frame}
+  \frametitle{Future Work}
+
+  \begin{itemize}
+  \item Deployment scenarios
+  \item Dynamic subflow addition and removal
+  \item Data scheduling
+  \item 0-RTT NAT establishment
+  \end{itemize}
+\end{frame}
+
+\appendix % slide numbering resets here
 
 \section{All Figures}
 \TitledFigureSlide{figures/sym.pdf}{Throughput Comparison, Symmetric}{}
