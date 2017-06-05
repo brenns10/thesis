@@ -1414,7 +1414,7 @@ the mechanism operating on the Internet.
 
 \section{Mininet Experiments}
 
-Our first set of experiments are based on the Mininet tool \cite{mininet}. As
+Our first set of experiments is based on the Mininet tool \cite{mininet}. As
 discussed in Section~\ref{sec:mn}, Mininet is a software-defined networking tool
 that allows emulation of large networks on a single machine using the native
 operating system networking stack.
@@ -1422,10 +1422,11 @@ operating system networking stack.
 \subsection{Fidelity Considerations}
 
 One criticism of the Mininet framework is that in situations with high load, its
-performance fidelity can suffer \cite{lantz2010network}. Later work has
-addressed this by allowing users to limit the CPU utilization of each emulated
-host, as well as restricting the bandwidth of links using the Linux traffic
-control features \cite{handigol2012reproducible}.
+timing fidelity (i.e., the accuracy of the performance results) can suffer
+\cite{lantz2010network}. Later work has addressed this by allowing users to
+limit the CPU utilization of each emulated host, as well as restricting the
+bandwidth of links using the Linux traffic control features
+\cite{handigol2012reproducible}.
 
 We observed that our test systems could emulate networks with throughput up to
 24 Gbps. To ensure that our experiments did not approach the limits of Mininet's
@@ -1447,16 +1448,17 @@ than 5\% over the course of an experiment.
 \end{figure}
 
 Our network topology is illustrated in Figure~\ref{fig:topo}. The routers,
-client, server, and detour are Linux hosts, as described in the previous
-section. They are statically configured with routes, so that the default route
-from \texttt{client} to \texttt{server} traverses Link 2. Routing is enabled,
-and all routing occurs within the kernel.
+client, server, and detour are Linux hosts, as described in
+Section~\ref{sec:mn}. They are statically configured with routes, so that the
+default route from \texttt{client} to \texttt{server} traverses Link 2. Routing
+is enabled, and all routing occurs within the kernel.
 
 While configuring routing tables, we encountered issues where Linux kernel
 routing rejected incoming packets as ``Martians.'' That is, packets which
 originated from an interface which is not the default route for their source
 address. To avoid these issues, we disabled Martian filtering in the Linux
-kernel.
+kernel. This appears to be an artifact of our test environment, unrelated to the
+mechanism.
 
 \subsection{Methodology}
 
@@ -1470,8 +1472,8 @@ configurations tested.
 \item \textbf{Core-limited.} The second configuration gives each link within the
   network ``core'' (i.e. links 2, 4, and 5) 10Mbps of bandwidth and a 5ms delay.
   Meanwhile, the access links (i.e. links 1, 3, and 6) are assigned 20Mbps, with
-  the same 5ms delay. This aims to provide a simplified configuration in which
-  the access link can support more bandwidth than the default Internet path.
+  the same 5ms delay. This aims to simulate a situation in which the access link
+  can support more bandwidth than the default Internet path can support.
 \end{itemize}
 
 We chose 10Mbps links for two reasons. First, it can model a situation in which
@@ -1491,7 +1493,7 @@ control configuration, we also create two modifications.
 This results in a total of six traffic control configurations. For each traffic
 control configuration, we use the standard IPerf 3 tool to measure \ac{mptcp} or
 TCP throughput between \texttt{client} and \texttt{server}. We test the
-following configurations:
+following procedures:
 
 \begin{itemize}
 \item \textbf{1-Subflow.} MPTCP is enabled, but no detours are configured on the
@@ -1526,33 +1528,72 @@ trials for each combination of parameters.
 
 \begin{figure}
   \centering
-  \includegraphics[height=0.45\textheight]{figures/sym.pdf}
+  \includegraphics[height=0.42\textheight]{figures/sym.pdf}
   \caption{Throughput Comparison: Symmetric}
   \label{fig:sym}
 \end{figure}
 
 Figure~\ref{fig:sym} shows a performance comparison of the mechanism on the
-Symmetric network without loss or latency. In this comparison, we can see three
-important conclusions. First, splitting the traffic across two paths when the
-bottleneck is shared results in more overhead and lower throughput. Second,
-\ac{mptcp} with a single subflow shows more variable throughput behavior than
-regular TCP. Third, regular TCP over the \ac{nat} detour demonstrates slightly
-higher throughput than regular TCP over the VPN, although the difference is
-small (0.5 Mbps).
+Symmetric network without loss or latency. In this figure, each distribution is
+represented by a box outlining the first and third quartiles of the data, with a
+line through the center representing the median. The whiskers show the spread of
+the data, and points outside of 1.5 times the interquartile range are marked
+with circles as outliers. The data shown in this and all subsequent
+box-and-whisker plots of this section are also given in tabular form in
+Table~\ref{t:d} in the Appendix.
+
+In this configuration, we can see four important pieces of information. First,
+we observe the overhead of single-subflow \ac{mptcp} compared to TCP to be
+around 140kbps in this scenario. This amounts to a 1.5\% loss in throughput.
+This overhead is due to the presence of the \ac{dss} option in each segment. In
+packet captures, we observed that the Linux \ac{mptcp} implementation tends to
+send a \ac{dss} option with every data packet, and that these options are
+usually 20 bytes. On TCP segments with MSS of 1460, this amounts to 1.37\% of
+the MSS. So, the observed \ac{mptcp} overhead is in line with expectations.
+
+Second, by comparing the TCP and TCP (NAT) throughputs, we can observe the
+overhead inherent in the \ac{nat} mechanism when compared to TCP over the
+default route. This overhead will of course vary depending on topology, but the
+added processing incurred by the \ac{nat} detour mechanism must be less than
+this overhead. We see about 200kbps overhead, or around 2\%.
+
+Third, by comparing the TCP and TCP (VPN) throughputs, we can observe the
+overhead inherent in the VPN mechanism when compared to TCP over the default
+route. We see a much greater overhead of 630kbps, or 6.6\%. In packet captures,
+we observed that the MSS of normal TCP segments was 1428, while the MSS of TCP
+segments transmitted through OpenVPN was 1337, leaving 91 bytes of overhead.
+This amounts to 6.4\% of the segment size. So, again, the observed in OpenVPN is
+in line with expectations.
+
+Fourth, we can see that \ac{mptcp} with the \ac{nat} detour performs identically
+to 1-Subflow \ac{mptcp}, even though the two subflows of this mechanism must
+compete for the access link capacity. Due to the increased overhead of the VPN
+approach, \ac{mptcp} with the VPN detour does not perform as well. However, the
+difference is smaller than the difference between TCP and TCP (VPN), since the
+subflow on the default path makes up for some of the overhead.
 
 \begin{figure}
   \centering
-  \includegraphics[height=0.45\textheight]{figures/sym-lossy.pdf}
+  \includegraphics[height=0.42\textheight]{figures/sym-lossy.pdf}
   \caption{Throughput Comparison: Symmetric, with Loss}
   \label{fig:sym_lossy}
 \end{figure}
 
 In Figure~\ref{fig:sym_lossy}, we see the effect of adding a 1\% loss rate to a
 link that is present only on the default path. Regular TCP and \ac{mptcp} with
-one subflow show significant losses in throughput, although \ac{mptcp} is much
-worse. When \ac{nat} or VPN paths are added to the \ac{mptcp} connection, the
-performance is comparable to regular TCP traveling solely across those paths,
-but no better.
+one subflow show significant losses in throughput, and much more variable
+throughput as well. Under loss, \ac{mptcp} performs worse relative to TCP
+because its \ac{lia} congestion control is more conservative than the CUBIC
+congestion control used by regular TCP.
+
+\ac{mptcp} with \ac{nat} very slightly outperforms TCP (NAT), and \ac{mptcp}
+with VPN very slightly outperforms TCP (VPN). In both cases, the difference is
+not statistically significant. In fact, \ac{mptcp} with detours shows much more
+variability (standard deviations of 0.08 and 0.17 for \ac{nat} and VPN
+respectively). This is because the variability of the subflow along the default
+route adds variability to the overall connection.
+
+% TODO: start here when continuing revising Evaluation
 
 \begin{figure}[p]
   \centering
@@ -1860,6 +1901,7 @@ Symmetric, 50ms Delay & 9.42 (0.00) & 9.41 (0.01) & 9.23 (0.04) & 9.55 (0.01) & 
   Standard deviation in parentheses. Rows marked with (*) have 60 trials, other
   rows have 20 trials.
 }
+\label{t:d}
 \end{table}
 
 \bibliographystyle{ieeetr}
