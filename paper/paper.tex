@@ -249,7 +249,7 @@ simultaneously, aggregating their available throughput.
 
 \section{Concept}
 
-\begin{figure}
+\begin{figure}[htbp]
   \centering
   \includegraphics[width=0.8\textwidth]{figures/Concept.pdf}
   \caption{Conceptual overview of the mechanism}
@@ -341,15 +341,15 @@ resiliency of standard TCP. Other transport protocols support similar high-level
 goals, such as SCTP with Concurrent Multipath Transfer
 \cite{iyengar2006concurrent}. However, SCTP cannot easily be used as a
 replacement for TCP, because applications require modification to use SCTP, and
-some \acp{nat} and firewalls do not support SCTP \cite{barre2011multipath}. In
-contrast, \ac{mptcp} aims to be compatible with unmodified applications and
+some \ac{nat} boxes and firewalls do not support SCTP \cite{barre2011multipath}.
+In contrast, \ac{mptcp} aims to be compatible with unmodified applications and
 common Internet middleboxes, so it can be deployed widely.
 
 \ac{mptcp}'s design focuses on two types of compatibility, which motivate many
 of its high-level design decisions. First, application compatibility: \ac{mptcp}
 must be usable by existing TCP applications without modification. Second,
 network compatibility: \ac{mptcp} must be usable across the Internet today,
-including across features of the modern Internet such as \acp{nat}, firewalls,
+including across features of the modern Internet such as \ac{nat}, firewalls,
 traffic normalizers, and performance-enhancing proxies (collectively referred to
 as middleboxes). In the design of \ac{mptcp}, consideration is made for the
 following types of disruption by middleboxes \cite{rfc6182}:
@@ -370,8 +370,7 @@ following types of disruption by middleboxes \cite{rfc6182}:
 \item TCP segments may be broken up or coalesced \cite{hesmans2013tcp}. For
   example, TCP Segmentation Offload is a feature supported by some NICs, which
   advertises a large MSS value to the TCP stack, and then splits large segments
-  into smaller ones in hardware. TCP options on these segments must be
-  constructed in a way that this process will not make the data uninterpretable.
+  into smaller ones in hardware.
 \end{itemize}
 
 Finally, an additional network compatibility requirement is that \acl{mptcp}
@@ -430,7 +429,7 @@ with the \texttt{REMOVE\_ADDR} option. Neither option is acknowledged, so
 delivery of the option is not guaranteed.
 
 Data has sequence numbers at both the subflow level and at the connection level.
-Each subflow has a \ac{dss} negotiated via the \ac{mptcp} option type
+Each subflow has a \ac{dss} transmitted via the \ac{mptcp} option type
 \texttt{DSS}, which maps subflow sequence numbers to data sequence numbers.
 These mappings are valid for only a certain amount of bytes, and thus new
 mappings must be transmitted periodically. As a result, the \ac{dss} is one
@@ -734,7 +733,7 @@ Our mechanism also uses OpenVPN, as one of the two implementation alternatives
 for the detour. However, a key difference is that while Binder uses OpenVPN over
 \ac{mptcp}, we only put a single subflow of an \ac{mptcp} connection through
 OpenVPN, essentially leveraging OpenVPN for tunneling. Furthermore, while Binder
-enables bandwidth aggregation, it does not leverage source routing, as our
+enables bandwidth aggregation, it does not leverage detour routing, as our
 system does. Finally, Binder is a system which operates at a network gateway,
 while ours operates on a client host itself.
 
