@@ -1391,8 +1391,8 @@ The literature has already established that one-hop overlay routes can improve
 connection latency, loss rate, and throughput
 \cite{detour,ron,gummadi2004improving}. Therefore, when designing experiments to
 evaluate our system, we did not attempt to replicate these results. Instead, we
-demonstrate that our system, by using proof-of-concept tests. Specifically, we
-attempt to answer the following questions:
+demonstrate that our system performs as expected, by using proof-of-concept
+tests. Specifically, we attempt to answer the following questions:
 
 \begin{itemize}
 \item Given a network where an alternative path with better connection
@@ -1408,9 +1408,9 @@ attempt to answer the following questions:
 
 We design two types of experiments to answer each of these questions. The first
 is based on network emulation, and is designed to answer the first four
-questions regarding specific network topologies. The second experiment deploys
-this mechanism across geographically distributed hosts, as a proof-of-concept of
-the mechanism operating on the Internet.
+questions. The second experiment deploys this mechanism across geographically
+distributed hosts, as a proof-of-concept of the mechanism operating on the
+Internet.
 
 \section{Mininet Experiments}
 
@@ -1439,7 +1439,7 @@ than 5\% over the course of an experiment.
 
 \subsection{Topology}
 
-\begin{figure}
+\begin{figure}[htbp]
   \centering
   \includegraphics[width=\textwidth]{figures/Topology.pdf}
   \caption[Experimental network topology]{Experimental network topology. Core
@@ -1451,7 +1451,7 @@ Our network topology is illustrated in Figure~\ref{fig:topo}. The routers,
 client, server, and detour are Linux hosts, as described in
 Section~\ref{sec:mn}. They are statically configured with routes, so that the
 default route from \texttt{client} to \texttt{server} traverses Link 2. Routing
-is enabled, and all routing occurs within the kernel.
+is enabled within the Linux kernel.
 
 While configuring routing tables, we encountered issues where Linux kernel
 routing rejected incoming packets as ``Martians.'' That is, packets which
@@ -1476,18 +1476,21 @@ configurations tested.
   can support more bandwidth than the default Internet path can support.
 \end{itemize}
 
-We chose 10Mbps links for two reasons. First, it can model a situation in which
-the connection only receives a fraction of the available bandwidth in the
-network core. Second, it keeps the total throughput of the system well under the
-limitations of our test system, ensuring accurate emulation. For each traffic
-control configuration, we also create two modifications.
+We chose 10Mbps links for two reasons. First, lower capacity links emulate the
+scenario where the network core can only provide a fraction of capacity to one
+connection. Second, lower capacity links keep the total throughput of the system
+well under the limitations of our test system, ensuring accurate emulation. For
+each traffic control configuration, we also create two modifications.
 
 \begin{itemize}
 \item \textbf{Lossy.} Link 2 is configured to drop packets independently and
   randomly with probability 0.01. This is within the range of packet loss rates
   Savage \textit{et al.} observe over ``bad'' paths in their Detour study
-  \cite{detour}.
-\item \textbf{Delayed.} Link 2 is configured to have a high (100ms) latency.
+  \cite{detour}. We ran smaller experiments with loss rates of 0.5\%, 2\%, and
+  5\%, with similar results to the ones presented here.
+\item \textbf{Delayed.} Link 2 is configured to have a high (100ms) latency. We
+  also tested latencies of 20ms and 50ms, although 100ms was the first to show
+  observable differences in throughput.
 \end{itemize}
 
 This results in a total of six traffic control configurations. For each traffic
@@ -1526,7 +1529,7 @@ trials for each combination of parameters.
 
 \subsection{Results}
 
-\begin{figure}
+\begin{figure}[htbp]
   \centering
   \includegraphics[height=0.42\textheight]{figures/sym.pdf}
   \caption{Throughput Comparison: Symmetric}
@@ -1572,7 +1575,7 @@ approach, \ac{mptcp} with the VPN detour does not perform as well. However, the
 difference is smaller than the difference between TCP and TCP (VPN), since the
 subflow on the default path makes up for some of the overhead.
 
-\begin{figure}
+\begin{figure}[htbp]
   \centering
   \includegraphics[height=0.42\textheight]{figures/sym-lossy.pdf}
   \caption{Throughput Comparison: Symmetric, with Loss}
@@ -1593,75 +1596,80 @@ variability (standard deviations of 0.08 and 0.17 for \ac{nat} and VPN
 respectively). This is because the variability of the subflow along the default
 route adds variability to the overall connection.
 
-% TODO: start here when continuing revising Evaluation
-
-\begin{figure}[p]
+\begin{figure}[htbp]
   \centering
   \includegraphics[height=0.42\textheight]{figures/sym-delayed.pdf}
   \caption{Throughput Comparison: Symmetric, with Latency}
   \label{fig:sym_delayed}
 \end{figure}
 
-\begin{figure}[p]
-  \centering
-  \includegraphics[height=0.42\textheight]{figures/timegrid-sym-delayed.pdf}
-  \caption[Throughput Over Time: Symmetric, with Latency]{Throughput Over Time:
-    Symmetric, with Latency. Units are Mbps on the y-axis and seconds along the
-    x-axis.}
-  \label{fig:timegrid_sym_delayed}
-\end{figure}
-
 In Figure~\ref{fig:sym_delayed}, we see the impact of the high latency link
-along the default route. While it appears that there could be a somewhat
-significant difference between the throughput, this is not the case.
-Figure~\ref{fig:timegrid_sym_delayed} shows the throughput over time for
-each of the experiments. Each of the experiments reaches nearly the same steady
-state throughput, but at different times. This is most likely explained by the
-different congestion control mechanisms used (CUBIC for regular TCP, versus the
-Linked Increases algorithm used by \ac{mptcp}).
+along the default route. The performance of 1-Subflow \ac{mptcp} and standard
+TCP suffers due to the increased round trip time. \ac{mptcp} with the \ac{nat}
+detour is able to achieve a similar throughput to TCP (NAT), since the Lowest
+RTT first scheduler routes 82.3\% of the data across the detour subflow.
+\ac{mptcp} with the VPN detour demonstrates unusual behavior. Despite the
+increased latency of the default route, only 48.0\% of data is scheduled across
+the VPN detour, suggesting that the VPN adds a significant amount of latency.
 
-\begin{figure}[p]
+\begin{figure}[htbp]
   \centering
-  \includegraphics[height=0.45\textheight]{figures/easy.pdf}
+  \includegraphics[height=0.42\textheight]{figures/easy.pdf}
   \caption{Throughput Comparison: Core-limited}
   \label{fig:easy}
-\end{figure}
-
-\begin{figure}[p]
-  \centering
-  \includegraphics[height=0.45\textheight]{figures/lossy.pdf}
-  \caption{Throughput Comparison: Core-limited, with Loss}
-  \label{fig:lossy}
 \end{figure}
 
 The results for the core-limited network are much different.
 Figure~\ref{fig:easy} shows a comparison of throughput on the core-limited
 network, with no loss or latency. Since the detour path traverses different core
 links than the default path, there is no competition. Thus there is the
-potential to aggregate the capacity of both paths. Both the \ac{nat} and VPN
-methods are able to aggregate nearly all of the capacity, although the \ac{nat}
-performs very slightly better.
+potential to aggregate the capacity of both paths. The \ac{nat} detour achieves
+98.5\% of the sum of the throughputs of TCP and TCP (NAT). The VPN detour
+obtains a 98.1\% of the sum of the throughputs of TCP and TCP (VPN). Again, the
+\ac{nat} detour performs better than the VPN detour due to the packet overhead
+of OpenVPN.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[height=0.42\textheight]{figures/lossy.pdf}
+  \caption{Throughput Comparison: Core-limited, with Loss}
+  \label{fig:lossy}
+\end{figure}
 
 When loss is introduced, Figure~\ref{fig:lossy} shows that the \ac{nat} and VPN
 methods outperform their pure TCP variants, since they are able to aggregate the
 throughput of both paths. Even though the default path is lossy, it is able to
 contribute some throughput to the \ac{mptcp} connection.
 
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[height=0.42\textheight]{figures/delayed.pdf}
+  \caption{Throughput Comparison: Core-limited, with Latency}
+  \label{fig:delayed}
+\end{figure}
+
+Similarly, when latency is introduced, Figure~\ref{fig:delayed} shows that the
+\ac{nat} detour continues to aggregate throughput, although with slightly more
+variability. The VPN detour again demonstrates unusual behavior. In some trials,
+the VPN had a very high round trip time, resulting in a long slow-start period
+and very low connection throughput. We believe this could be due to an artifact
+of our testing framework.
+
 \subsection{Summary}
 
-By emulating a network with varying conditions, we were able to examine how this
-mechanism can aggregate throughput in different situations. When the mechanism
-is used in a network with no traffic quality issues and no potential for
-aggregation, there is a modest overhead. In a similar network with poor
-connection characteristics along the default path, the mechanism is capable of
-achieving throughput similar to a single flow across an alternative path.
-When the network has potential for aggregation, the mechanism is capable if
-aggregating nearly all of the available throughput. This results in better
-performance than a single flow across any available path.
+By emulating a network with varying conditions, we were able to verify that the
+mechanism works as expected. By directing subflows across detour routes,
+\ac{mptcp} is able to achieve path bandwidth aggregation in some cases. In
+situations where no benefit can be achieved by bandwidth aggregation, the
+mechanism incurs at least a 1.5\% overhead due to \ac{mptcp} signaling. This
+overhead quickly is overcome when loss or latency is added to one of the paths.
+When path bandwidth aggregation is possible, the mechanisms are capable of
+aggregating over 98\% of the sum of the throughputs achieved by TCP across both
+paths.
 
 Across all the connections, the \ac{nat} approach performs slightly better than
-the VPN, likely due to the additional overhead of the IP and UDP encapsulation,
-along with any OpenVPN protocol overhead.
+the VPN, due to the additional overhead of the IP and UDP encapsulation, along
+with OpenVPN protocol overhead and latency.
 
 \section{AWS Experiment}
 
@@ -1673,11 +1681,11 @@ more heterogeneous. To demonstrate the feasibility of this mechanism on the wide
 area Internet, we designed a full-scale experiment.
 
 Using Amazon Web Services' Elastic Cloud Compute service (AWS EC2), we deployed
-three instances, each in a different region. The client is located in the
-\texttt{us-west-1} region (Northern California), the detour in
-\texttt{us-east-2} (Ohio), and the server in \texttt{us-east-1} (Northern
-Virginia). We then ran the IPerf 3 tool for 100 trials in each of the following
-configurations: \textbf{1-Subflow}, \textbf{\ac{nat}}, and \textbf{OpenVPN}.
+three instances of type \texttt{m4.large}, each in a different region. The
+client is located in the \texttt{us-west-1} region (Northern California), the
+detour in \texttt{us-east-2} (Ohio), and the server in \texttt{us-east-1}
+(Northern Virginia). We then ran the IPerf 3 tool for 100 trials in each of the
+same configurations as the previous experiments.
 
 \begin{figure}
   \centering
@@ -1686,17 +1694,13 @@ configurations: \textbf{1-Subflow}, \textbf{\ac{nat}}, and \textbf{OpenVPN}.
   \label{fig:aws}
 \end{figure}
 
-Figure~\ref{fig:aws} shows a comparison of the throughput for each of these
-connections. It is clear from this figure that adding a detour was not effective
-in improving throughput. However, it is clear that our mechanism is capable of
-functioning on the wide-area Internet, at higher transmission rates than we
-emulated in the Mininet experiments.
-
-Another interesting result of this experiment is that the OpenVPN mechanism,
-which performed slightly worse than the \ac{nat} mechanism in our Mininet tests,
-slightly outperforms the \ac{nat} mechanism. Due to the wide variability in the
-data, it is not clear whether this result is due to noise or due to an
-underlying aspect of the mechanism.
+Figure~\ref{fig:aws} shows a throughput comparison. The connections were able to
+achieve a much higher throughput than in the emulated networks. None of the
+\ac{mptcp} based configurations were able to outperform standard TCP. The most
+important result of this experiment is that standard TCP across the VPN detour
+is not capable of achieving more than about 60Mbps, due to the increased
+processing overhead of OpenVPN. As a result, in terms of capability to enable
+high throughput transfers, the \ac{nat} detour is a better choice.
 
 \chapter{Future Work}
 \label{c:fw}
@@ -1851,9 +1855,9 @@ several user-space utilities which complete the system.
 
 The implementation is structured so that two different mechanisms for tunneling
 subflows are allowed. We have seen that the \ac{nat} approach has slightly
-better performance due to its lower per-packet overhead. However, that increased
-performance comes at the expense of an extra \ac{rtt} for setting up a tunnel,
-and the extra complexity of a dynamic client which creates them. The VPN
+better performance due to its lower space and processing overhead. However, that
+increased performance comes at the expense of an extra \ac{rtt} for setting up a
+tunnel, and the extra complexity of a dynamic client which creates them. The VPN
 approach is simpler, but has higher overhead.
 
 When compared to standard TCP over the best available path, this mechanism
@@ -1862,11 +1866,11 @@ However, when the paths have separate bottlenecks, this mechanism is capable of
 aggregating the bandwidth of both paths, achieving better performance than
 standard TCP across the best path.
 
-This mechanism is compatible with the wide area Internet today. We believe that
-as high-bandwidth access links become more common, the collaborative bandwidth
-sharing systems this enables will become more relevant. In the meantime, there
-are several opportunities for extending this work and using it to study problems
-like detour routing.
+This mechanism is compatible with unmodified applications on the wide area
+Internet today. We believe that as high-bandwidth access links become more
+common, the collaborative bandwidth sharing systems this enables will become
+more relevant. In the meantime, there are several opportunities for extending
+this work and using it to study problems like detour routing.
 
 \backmatter
 \appendix
@@ -1899,9 +1903,32 @@ Symmetric, 50ms Delay & 9.42 (0.00) & 9.41 (0.01) & 9.23 (0.04) & 9.55 (0.01) & 
 \caption[Mininet experiment throughput]{
   Full Mininet throughput data. All units are Mbps (mega bits per second).
   Standard deviation in parentheses. Rows marked with (*) have 60 trials, other
-  rows have 20 trials.
+  rows have 20 trials. Values are in the form ``mean (standard deviation)''.
 }
 \label{t:d}
+\end{table}
+
+\begin{table}[H]
+  \resizebox{\columnwidth}{!}{%
+  \begin{tabular}{l|rrrr}
+  Configuration              & Bytes, Default & Bytes, Detour & Percent, Default & Percent, Detour\\
+  \hline
+  Core-limited, NAT          & 12833473 & 12784884 & 50.09\% & 49.91\% \\
+  Core-limited, VPN          & 12752000 & 9446808 & 57.44\% & 42.56\% \\
+  Core-limited, Lossy, NAT   & 5881969 & 12039468 & 32.82\% & 67.18\% \\
+  Core-limited, Lossy, VPN   & 5607324 & 8957956 & 38.50\% & 61.50\% \\
+  Core-limited, Delayed, NAT & 12572613 & 11800992 & 51.58\% & 48.42\% \\
+  Core-limited, Delayed, VPN & 12558642 & 10273609 & 55.00\% & 45.00\% \\
+  Symmetric, NAT             & 6997237 & 6083280 & 53.49\% & 46.51\% \\
+  Symmetric, VPN             & 10655479 & 2638377 & 80.15\% & 19.85\% \\
+  Symmetric, Lossy, NAT      & 859693 & 11737856 & 6.82\% & 93.18\% \\
+  Symmetric, Lossy, VPN      & 1885375 & 8912407 & 17.46\% & 82.54\% \\
+  Symmetric, Delayed, NAT    & 2380513 & 11062716 & 17.71\% & 82.29\% \\
+  Symmetric, Delayed, VPN    & 6502281 & 5990180 & 52.05\% & 47.95\% \\
+  \end{tabular}
+  }
+  \caption[Bytes transmitted across subflows]{Bytes transmitted across subflows.
+  Measured from 1 trial in each of the configurations, via packet captures.}
 \end{table}
 
 \bibliographystyle{ieeetr}
