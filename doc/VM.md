@@ -16,16 +16,16 @@ your host:
 
     # from thesis directory
     ./pkg.sh
-    
+
 This will build the file `vm.tar`. Go ahead and scp that over to the VM. Untar
 it with the following command:
 
     tar xf pkg.sh
-    
+
 This untars into the homedir. Next, use my setup script:
 
     ./setup.sh
-    
+
 This will install the custom kernel and do any other necessary setup items. Once
 it completes, all you will need to do is reboot. Make sure to hold shift during
 startup so that GRUB will give you the option to select your new kernel.

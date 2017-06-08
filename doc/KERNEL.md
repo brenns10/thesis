@@ -1,7 +1,22 @@
 Kernel
 ======
 
-Kernel development is a new world and it's worth documenting.
+Kernel development is a new world and it's worth documenting. This document
+includes information about how I configured my "development kernel". Having a
+development kernel which is quick to boot and test, and quick to recompile (with
+very small configuration) is really important.
+
+Virtual Machine
+---------------
+
+My virtual machine setup (with vido) is documented here:
+
+https://brennan.io/2017/03/08/sane-kernel-dev/
+
+Vido depends on qemu, a pretty nice virtualization system. The configuration
+stuff below describes how I configured my source tree for running within Vido.
+See `AWSBUILD.md` for more description of how I configured and built the kernel
+for "production" uses.
 
 Configuration
 -------------

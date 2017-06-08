@@ -1,6 +1,10 @@
 Detour Setup
 ============
 
+(Not entirely outdated, but you may not need to deal with this if you're using
+the experiment stuff. This document does contain useful info if you want to set
+up the detour in a new environment that isn't an experiment.)
+
 This document describes how to get the detour point running. Unlike the client,
 there is no need for a virtual machine, and the requirements are dramatically
 simpler.

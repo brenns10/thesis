@@ -1,6 +1,10 @@
 Documentation
 =============
 
+This documentation directory is rather cluttered. Not all of the stuff here is
+most relevant to a newcomer. The README in the index contains relevant pointers
+to guides which should help you run my experiments.
+
 Setup
 -----
 

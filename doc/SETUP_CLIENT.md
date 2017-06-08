@@ -1,6 +1,8 @@
 Client Setup
 ============
 
+(OUTDATED - this documented an early validation setup)
+
 This document describes the steps necessary to set up my environment. I intend
 to keep it completely up-to-date so that starting fresh would require only
 following the steps described in this document.

@@ -11,46 +11,46 @@ The goal of this project is to create a system which can allow users to improve
 the reliability of a connection by using MPTCP to tunnel the connection through
 another detour point.
 
+It's implemented within the Linux kernel, so applications may use it without
+modification.
+
 Documentation
 -------------
 
-I've discovered that there is no way to complete this project without lots of
-documentation about how to do the things I'm doing. Therefore I'm always
-maintaining a directory full of documentation.  [Here](doc/) is the root
-of that documentation.
+There's a ton of background documentation located in the `doc` folder. Much of
+it may not be relevant to those wishing to reproduce/rebuild my results, since I
+used this directory to hold useful commands and other goodies mostly relevant to
+me. To guide the future visitor through the major pain points of reproduction,
+here are some links to pieces of documentation. Each folder should also contain
+a README explaining things, in case you find yourself lost.
 
-Manifest
---------
+1. `src/path-manager.patch` - does not currently exist yet, but will contain a
+   patch based on the 0.91 MPTCP Linux kernel to include my path manager.
 
-For experimentation, the important files you must have are:
+   To obtain a usable version of the customized Linux kernel, you will need to
+   apply this patch, configure the kernel, and build it. Configuration is an
+   annoying process. I discuss configuring a "debugging/development" kernel in
+   `doc/KERNEL.md`. I discuss configuring and building a "release" kernel in
+   `doc/AWSBUILD.md`.
 
-1. tmp/linux-firmware-image.deb
-2. tmp/linux-image.deb - both of these are created by compiling my MPTCP kernel
-   with `make deb-pkg` on a ubuntu dev machine, with the ubuntu kernel config
-   found in `etc/`
-3. `src/*` everything in src gets copied over
-4. `etc/*` everything in etc gets copied over
-5. `setup.sh` sets up the experiment VM afterwards
+   Or you can simply use my `tmp/linux-image.deb` and
+   `tmp/linux-firmware-image.deb`. These are large and not stored in git, but
+   are stored in the archival version of this repository.
 
-The program `pkg.sh` packages these up.
+2. To run any kind of experiment, you will need to create `vm.tar`, a tarball
+   containing the debian packages and source code for experiments. See
+   `doc/VM_TAR.md` for instructions you must follow.
 
-To summarize the experiment VM creation procedure:
+   Or you can use the included `vm.tar` (included with the archival version of
+   this repository).
 
-1. Import the mininet VM into your hypervisor of choice.
-2. Start it with host-only networking, to copy over vm.tar.
-3. Reboot it with NAT networking, and log in.
-4. Untar with the commands:
+   Or you can download it from `https://brenns10.keybase.io/vm.tar`
 
-       mkdir thesis
-       tar xf vm.tar -C thesis
+3. To run Mininet experiments, follow `doc/MN_EXPERIMENT.md`
 
-5. Then execute:
+4. To run AWS experiments, follow `doc/AWS_EXPERIMENT.md`
 
-       cd thesis
-       ./setup.sh
-       sudo reboot
+Data
+----
 
-6. Make sure to hold shift during GRUB in order to select the custom kernel.
-7. Run experiment, which starts by going:
-
-       sudo python thesis/src/detour_topology.py
+See `data/REAMDE.md`

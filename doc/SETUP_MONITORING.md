@@ -1,6 +1,10 @@
 Monitoring Setup
 ================
 
+(Somewhat outdated. This helped me do monitoring at the router level in my home
+network. Monitoring in the experiments is done via the `--trace` flag to
+`experiment.py`.)
+
 In order to monitor network traffic, Wireshark is typically your best friend.
 However, once you start getting into packet mangling and NAT, the picture from
 your laptop's NIC ceases to be good enough. So, I found it useful to do a TCP
