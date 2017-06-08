@@ -14,6 +14,9 @@ another detour point.
 It's implemented within the Linux kernel, so applications may use it without
 modification.
 
+You can find PDFs of the paper and slides, as well as pre-built VM images, on my
+website: https://brennan.io/thesis
+
 Documentation
 -------------
 
