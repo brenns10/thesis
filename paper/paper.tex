@@ -471,7 +471,8 @@ alternative addresses, the Linux implementation uses another modular component
 called a ``path manager'' \cite{mptcp}. The default implementation does nothing
 (except accepting incoming connections). The Linux implementation also includes
 an \texttt{ndiffports} path manager, which initiates up to $N$ subflows with a
-server, from different TCP source ports. This path manager can be useful for
+server, from different TCP source ports, and the same IP address. $N$ is a
+configurable parameter set to 2 by default. This path manager can be useful for
 \ac{ecmp}, as we discuss in Section~\ref{sec:ecmp}. A \texttt{fullmesh} path
 manager establishes subflows between every pair of client addresses and
 advertised server addresses. A major part of the implementation of this thesis
@@ -1012,11 +1013,12 @@ conflicts.
 
 Finally, in order to forward VPN traffic to the Internet, the detour must be
 configured (via Netfilter) to perform network address translation (\ac{nat}) on
-outgoing packets. This process is typical for a home router and for VPNs which
-provide Internet access \cite{rfc3022,yonan2007openvpn}. As discussed earlier,
-\ac{mptcp} is designed with this behavior in mind, and so it is capable of
-functioning through \ac{nat}, so long as the middleboxes do not remove TCP
-options in transit, or modify data contents \cite{rfc6182}.
+outgoing packets (this functionality is not provided by OpenVPN itself). This
+process is typical for a home router and for VPNs which provide Internet access
+\cite{rfc3022,yonan2007openvpn}. As discussed earlier, \ac{mptcp} is designed
+with this behavior in mind, and so it is capable of functioning through
+\ac{nat}, so long as the middleboxes do not remove TCP options in transit, or
+modify data contents \cite{rfc6182}.
 
 The OpenVPN implementation has several attractive qualities. First, it relies on
 a well-used protocol for forwarding traffic. Second, an established OpenVPN
@@ -1339,11 +1341,12 @@ its configuration file. A separate thread is launched, which calls
 from any detour.
 
 Finally, the detour creates a Netlink socket, subscribes to the path manager's
-multicast group, and begins waiting for requests. For each request, it sends a
-UDP request to every \ac{nat} detour. When the receiving thread receives a
-response, it sends the final \ac{nat} detour information back over the Netlink
-socket to the path manager. The path manager may then apply the \ac{nat} detour
-to any \ac{mptcp} connections which may use it.
+multicast group, and begins waiting for requests. For each request from the path
+manager, the client daemon sends a UDP request to every \ac{nat} contained in
+the configuration file. When the receiving thread receives a response, it sends
+the final \ac{nat} detour information back over the Netlink socket to the path
+manager. The path manager may then apply the \ac{nat} detour to any \ac{mptcp}
+connections which may use it.
 
 The client daemon may also send \texttt{DETOUR\_C\_DEL} requests to the kernel
 in order to clean up older detours. The path manager itself only cleans up
@@ -1695,11 +1698,12 @@ same configurations as the previous experiments.
 
 Figure~\ref{fig:aws} shows a throughput comparison. The connections were able to
 achieve a much higher throughput than in the emulated networks. None of the
-\ac{mptcp} based configurations were able to outperform standard TCP. The most
-important result of this experiment is that standard TCP across the VPN detour
-is not capable of achieving more than about 60Mbps, due to the increased
-processing overhead of OpenVPN. As a result, in terms of capability to enable
-high throughput transfers, the \ac{nat} detour is a better choice.
+\ac{mptcp} based configurations were able to outperform standard TCP, because
+the detour was not able to provide bandwidth aggregation. The most important
+result of this experiment is that standard TCP across the VPN detour is not
+capable of achieving more than about 60Mbps, due to the increased processing
+overhead of OpenVPN. As a result, in terms of capability to enable high
+throughput transfers, the \ac{nat} detour is a better choice.
 
 \chapter{Future Work}
 \label{c:fw}
@@ -1779,9 +1783,10 @@ In the \ac{ron} system, overlay routing is performed at each node \cite{ron}.
 Similarly, the Detour study describes a system in which routing is performed at
 each overlay node \cite{detour}. In our system, we apply source routing. While
 overlay routing mechanisms have been described for systems like \ac{ron} and
-Detour, we are unaware of algorithms which attempt to find the best route for a
-packet from its source, with incomplete knowledge of the capacity and state of
-the network links.
+Detour, we are aware of few detour selection strategies. One strategy, employed
+in voice calling applications, makes use of historical data regarding connection
+performance \cite{jiang2016via}. Selecting detours without prior knowledge of
+connection quality, or network topology, is a difficult problem.
 
 An extension to this work would be to extend it with such an algorithm. This
 algorithm would maintain several \ac{mptcp} subflows, and every so often it
