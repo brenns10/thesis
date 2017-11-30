@@ -2,7 +2,7 @@ Thesis
 ======
 
 This repository holds all the work for my Master's thesis, including code,
-references, documentation, and of course the thesis itself.
+references, documentation, data, and of course the thesis document itself.
 
 Overview
 --------
@@ -27,8 +27,8 @@ me. To guide the future visitor through the major pain points of reproduction,
 here are some links to pieces of documentation. Each folder should also contain
 a README explaining things, in case you find yourself lost.
 
-1. `src/path-manager.patch` - does not currently exist yet, but will contain a
-   patch based on the 0.91 MPTCP Linux kernel to include my path manager.
+1. `src/path-manager.patch` - contains a patch based on the 0.91 MPTCP Linux
+   kernel to include my path manager.
 
    To obtain a usable version of the customized Linux kernel, you will need to
    apply this patch, configure the kernel, and build it. Configuration is an
@@ -38,7 +38,11 @@ a README explaining things, in case you find yourself lost.
 
    Or you can simply use my `tmp/linux-image.deb` and
    `tmp/linux-firmware-image.deb`. These are large and not stored in git, but
-   are stored in the archival version of this repository.
+   are stored in the archival version of this repository, and on my website:
+
+   https://brennan.io/downloads/linux-image.deb
+
+   https://brennan.io/downloads/linux-firmware-image.deb
 
 2. To run any kind of experiment, you will need to create `vm.tar`, a tarball
    containing the debian packages and source code for experiments. See
@@ -47,7 +51,7 @@ a README explaining things, in case you find yourself lost.
    Or you can use the included `vm.tar` (included with the archival version of
    this repository).
 
-   Or you can download it from `https://brenns10.keybase.io/vm.tar`
+   Or you can download it from https://brennan.io/downloads/vm.tar
 
 3. To run Mininet experiments, follow `doc/MN_EXPERIMENT.md`
 
