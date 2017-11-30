@@ -121,6 +121,10 @@ the AWS ecosystem. In particular, you should have:
 4. Configure the default security group in your AWS account to allow ingress on
    any port. (See docstring of `src/aws_experiment.py`).
 
+Additionally (not related to AWS), you must host `vm.tar` (see Building Blobs
+below) in an Internet-reachable location. This (and the above) is documented in
+the `doc/AWS_EXPERIMENT.md` file.
+
 You may run the AWS experiment as so:
 
     python3 aws_experiment.py
