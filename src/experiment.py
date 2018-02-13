@@ -197,7 +197,7 @@ def setup_vpn(net):
         client.cmd('openvpn --remote %s 1194 udp --client --dev tun '
                    '--ca ../tmp/ca.crt --cert ../tmp/client1.crt '
                    '--key ../tmp/client1.key ' '--topology p2p --pull '
-                   '--nobind &' % detour.IP())
+                   '--auth none --cipher none --nobind &' % detour.IP())
 
         # We need to wait until the openvpn interface is up. This will also
         # give us the peer IP address, which we already configured, but it's

@@ -14,4 +14,5 @@ openvpn --dev tun \
 	--cert ../tmp/server.crt \
 	--key ../tmp/server.key \
 	--topology p2p \
+	--auth none --cipher none \
 	--push 'route "0.0.0.0 0.0.0.0 10.8.0.0 1000"'

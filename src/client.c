@@ -630,13 +630,16 @@ struct vpn_manager *detour_launch_openvpn(struct daemon_config *dc,
 	const char *openvpn_args[] = {
 		"openvpn",
 		"--remote", NULL, /* only add/modify args below this one! */
-		"--client",
 		"--dev", "tun",
+		"--client",
 		"--ca", KEYPATH "ca.crt",
 		"--cert", KEYPATH "client1.crt",
 		"--key", KEYPATH "client1.key",
-		"--topology", "p2p",
+		"--auth", "none",
+		"--cipher", "none",
+		/*"--ncp-disable",*/
 		"--pull",
+		"--topology", "p2p",
 		"--nobind",
 		NULL, /* this must be the last one */
 	};
