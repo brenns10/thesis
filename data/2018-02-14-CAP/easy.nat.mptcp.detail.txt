@@ -1,0 +1,209 @@
+1 arg remaining, starting with 'easy.nat.mptcp.pcap'
+Ostermann's tcptrace -- version 6.6.7 -- Thu Nov  4, 2004
+
+31622 packets seen, 31622 TCP packets traced
+elapsed wallclock time: 0:00:00.028172, 1122462 pkts/sec analyzed
+trace file elapsed time: 0:00:13.773913
+TCP connection info:
+4 TCP connections traced:
+TCP connection 1:
+	host a:        10.0.1.1:54000
+	host b:        10.0.3.2:5201
+	complete conn: yes
+	first packet:  Sun Feb 18 13:45:01.689810 2018
+	last packet:   Sun Feb 18 13:45:15.427019 2018
+	elapsed time:  0:00:13.737209
+	total packets: 30
+	filename:      easy.nat.mptcp.pcap
+   a->b:			      b->a:
+     total packets:            16           total packets:            14      
+     ack pkts sent:            15           ack pkts sent:            14      
+     pure acks sent:            9           pure acks sent:            5      
+     sack pkts sent:            1           sack pkts sent:            0      
+     dsack pkts sent:           1           dsack pkts sent:           0      
+     max sack blks/ack:         1           max sack blks/ack:         0      
+     unique bytes sent:       103           unique bytes sent:       197      
+     actual data pkts:          5           actual data pkts:          7      
+     actual data bytes:       103           actual data bytes:       198      
+     rexmt data pkts:           0           rexmt data pkts:           1      
+     rexmt data bytes:          0           rexmt data bytes:          1      
+     zwnd probe pkts:           0           zwnd probe pkts:           0      
+     zwnd probe bytes:          0           zwnd probe bytes:          0      
+     outoforder pkts:           0           outoforder pkts:           0      
+     pushed data pkts:          5           pushed data pkts:          7      
+     SYN/FIN pkts sent:       1/1           SYN/FIN pkts sent:       1/1      
+     req 1323 ws/ts:          Y/Y           req 1323 ws/ts:          Y/Y      
+     adv wind scale:            9           adv wind scale:            9      
+     req sack:                  Y           req sack:                  Y      
+     sacks sent:                1           sacks sent:                0      
+     urgent data pkts:          0 pkts      urgent data pkts:          0 pkts 
+     urgent data bytes:         0 bytes     urgent data bytes:         0 bytes
+     mss requested:          1460 bytes     mss requested:          1460 bytes
+     max segm size:            57 bytes     max segm size:           188 bytes
+     min segm size:             1 bytes     min segm size:             1 bytes
+     avg segm size:            20 bytes     avg segm size:            28 bytes
+     max win adv:           61440 bytes     max win adv:           60416 bytes
+     min win adv:           29696 bytes     min win adv:           28672 bytes
+     zero win adv:              0 times     zero win adv:              0 times
+     avg win adv:           47718 bytes     avg win adv:           45056 bytes
+     initial window:           37 bytes     initial window:            1 bytes
+     initial window:            1 pkts      initial window:            1 pkts 
+     ttl stream length:       103 bytes     ttl stream length:       197 bytes
+     missed data:               0 bytes     missed data:               0 bytes
+     truncated data:           15 bytes     truncated data:          146 bytes
+     truncated packets:         1 pkts      truncated packets:         1 pkts 
+     data xmit time:       13.478 secs      data xmit time:       13.593 secs 
+     idletime max:        12824.5 ms        idletime max:        12870.0 ms   
+     throughput:                7 Bps       throughput:               14 Bps  
+================================
+TCP connection 2:
+	host c:        10.0.6.2:39552
+	host d:        10.0.3.2:5201
+	complete conn: yes
+	first packet:  Sun Feb 18 13:45:01.845375 2018
+	last packet:   Sun Feb 18 13:45:15.463724 2018
+	elapsed time:  0:00:13.618349
+	total packets: 16
+	filename:      easy.nat.mptcp.pcap
+   c->d:			      d->c:
+     total packets:             8           total packets:             8      
+     ack pkts sent:             7           ack pkts sent:             8      
+     pure acks sent:            3           pure acks sent:            6      
+     sack pkts sent:            0           sack pkts sent:            0      
+     dsack pkts sent:           0           dsack pkts sent:           0      
+     max sack blks/ack:         0           max sack blks/ack:         0      
+     unique bytes sent:       189           unique bytes sent:         0      
+     actual data pkts:          3           actual data pkts:          0      
+     actual data bytes:       189           actual data bytes:         0      
+     rexmt data pkts:           0           rexmt data pkts:           0      
+     rexmt data bytes:          0           rexmt data bytes:          0      
+     zwnd probe pkts:           0           zwnd probe pkts:           0      
+     zwnd probe bytes:          0           zwnd probe bytes:          0      
+     outoforder pkts:           0           outoforder pkts:           0      
+     pushed data pkts:          3           pushed data pkts:          0      
+     SYN/FIN pkts sent:       1/1           SYN/FIN pkts sent:       1/1      
+     req 1323 ws/ts:          Y/Y           req 1323 ws/ts:          Y/Y      
+     adv wind scale:            9           adv wind scale:            9      
+     req sack:                  Y           req sack:                  Y      
+     sacks sent:                0           sacks sent:                0      
+     urgent data pkts:          0 pkts      urgent data pkts:          0 pkts 
+     urgent data bytes:         0 bytes     urgent data bytes:         0 bytes
+     mss requested:          1460 bytes     mss requested:          1460 bytes
+     max segm size:           187 bytes     max segm size:             0 bytes
+     min segm size:             1 bytes     min segm size:             0 bytes
+     avg segm size:            62 bytes     avg segm size:             0 bytes
+     max win adv:           61440 bytes     max win adv:           60416 bytes
+     min win adv:           58880 bytes     min win adv:           57344 bytes
+     zero win adv:              0 times     zero win adv:              0 times
+     avg win adv:           60342 bytes     avg win adv:           59538 bytes
+     initial window:            1 bytes     initial window:            0 bytes
+     initial window:            1 pkts      initial window:            0 pkts 
+     ttl stream length:       189 bytes     ttl stream length:         0 bytes
+     missed data:               0 bytes     missed data:               0 bytes
+     truncated data:          145 bytes     truncated data:            0 bytes
+     truncated packets:         1 pkts      truncated packets:         0 pkts 
+     data xmit time:        0.289 secs      data xmit time:        0.000 secs 
+     idletime max:        13137.3 ms        idletime max:        13137.0 ms   
+     throughput:               14 Bps       throughput:                0 Bps  
+================================
+TCP connection 3:
+	host e:        10.0.1.1:54001
+	host f:        10.0.3.2:5201
+	complete conn: RESET	(SYNs: 2)  (FINs: 0)
+	first packet:  Sun Feb 18 13:45:01.854437 2018
+	last packet:   Sun Feb 18 13:45:15.226602 2018
+	elapsed time:  0:00:13.372165
+	total packets: 17841
+	filename:      easy.nat.mptcp.pcap
+   e->f:			      f->e:
+     total packets:          9086           total packets:          8755      
+     resets sent:             164           resets sent:               0      
+     ack pkts sent:          8922           ack pkts sent:          8755      
+     pure acks sent:            1           pure acks sent:         8754      
+     sack pkts sent:            0           sack pkts sent:            0      
+     dsack pkts sent:           0           dsack pkts sent:           0      
+     max sack blks/ack:         0           max sack blks/ack:         0      
+     unique bytes sent:  12736369           unique bytes sent:         0      
+     actual data pkts:       8920           actual data pkts:          0      
+     actual data bytes:  12736369           actual data bytes:         0      
+     rexmt data pkts:           0           rexmt data pkts:           0      
+     rexmt data bytes:          0           rexmt data bytes:          0      
+     zwnd probe pkts:           0           zwnd probe pkts:           0      
+     zwnd probe bytes:          0           zwnd probe bytes:          0      
+     outoforder pkts:           0           outoforder pkts:           0      
+     pushed data pkts:         37           pushed data pkts:          0      
+     SYN/FIN pkts sent:       1/0           SYN/FIN pkts sent:       1/0      
+     req 1323 ws/ts:          Y/Y           req 1323 ws/ts:          Y/Y      
+     adv wind scale:            9           adv wind scale:            9      
+     req sack:                  Y           req sack:                  Y      
+     sacks sent:                0           sacks sent:                0      
+     urgent data pkts:          0 pkts      urgent data pkts:          0 pkts 
+     urgent data bytes:         0 bytes     urgent data bytes:         0 bytes
+     mss requested:          1460 bytes     mss requested:          1460 bytes
+     max segm size:          1428 bytes     max segm size:             0 bytes
+     min segm size:            37 bytes     min segm size:             0 bytes
+     avg segm size:          1427 bytes     avg segm size:             0 bytes
+     max win adv:           58880 bytes     max win adv:         2736640 bytes
+     min win adv:           29696 bytes     min win adv:           28672 bytes
+     zero win adv:              0 times     zero win adv:              0 times
+     avg win adv:           57714 bytes     avg win adv:         1690443 bytes
+     initial window:           37 bytes     initial window:            0 bytes
+     initial window:            1 pkts      initial window:            0 pkts 
+     ttl stream length:        NA           ttl stream length:        NA      
+     missed data:              NA           missed data:              NA      
+     truncated data:     12361734 bytes     truncated data:            0 bytes
+     truncated packets:      8919 pkts      truncated packets:         0 pkts 
+     data xmit time:       13.294 secs      data xmit time:        0.000 secs 
+     idletime max:           55.4 ms        idletime max:           54.0 ms   
+     throughput:           952454 Bps       throughput:                0 Bps  
+================================
+TCP connection 4:
+	host g:        10.0.6.2:58786
+	host h:        10.0.3.2:5201
+	complete conn: RESET	(SYNs: 2)  (FINs: 0)
+	first packet:  Sun Feb 18 13:45:01.969318 2018
+	last packet:   Sun Feb 18 13:45:15.237737 2018
+	elapsed time:  0:00:13.268418
+	total packets: 13735
+	filename:      easy.nat.mptcp.pcap
+   g->h:			      h->g:
+     total packets:          8886           total packets:          4849      
+     resets sent:               2           resets sent:             108      
+     ack pkts sent:          8884           ack pkts sent:          4486      
+     pure acks sent:            1           pure acks sent:         4484      
+     sack pkts sent:            0           sack pkts sent:            0      
+     dsack pkts sent:           0           dsack pkts sent:           0      
+     max sack blks/ack:         0           max sack blks/ack:         0      
+     unique bytes sent:  12683496           unique bytes sent:         0      
+     actual data pkts:       8882           actual data pkts:          0      
+     actual data bytes:  12683496           actual data bytes:         0      
+     rexmt data pkts:           0           rexmt data pkts:           0      
+     rexmt data bytes:          0           rexmt data bytes:          0      
+     zwnd probe pkts:           0           zwnd probe pkts:           0      
+     zwnd probe bytes:          0           zwnd probe bytes:          0      
+     outoforder pkts:           0           outoforder pkts:           0      
+     pushed data pkts:         30           pushed data pkts:          0      
+     SYN/FIN pkts sent:       1/0           SYN/FIN pkts sent:       1/0      
+     req 1323 ws/ts:          Y/Y           req 1323 ws/ts:          Y/Y      
+     adv wind scale:            9           adv wind scale:            9      
+     req sack:                  Y           req sack:                  Y      
+     sacks sent:                0           sacks sent:                0      
+     urgent data pkts:          0 pkts      urgent data pkts:          0 pkts 
+     urgent data bytes:         0 bytes     urgent data bytes:         0 bytes
+     mss requested:          1460 bytes     mss requested:          1460 bytes
+     max segm size:          1428 bytes     max segm size:             0 bytes
+     min segm size:          1428 bytes     min segm size:             0 bytes
+     avg segm size:          1427 bytes     avg segm size:             0 bytes
+     max win adv:           58880 bytes     max win adv:         2736640 bytes
+     min win adv:           58880 bytes     min win adv:          174080 bytes
+     zero win adv:              0 times     zero win adv:              0 times
+     avg win adv:           58866 bytes     avg win adv:         1557946 bytes
+     initial window:         8568 bytes     initial window:            0 bytes
+     initial window:            6 pkts      initial window:            0 pkts 
+     ttl stream length:        NA           ttl stream length:        NA      
+     missed data:              NA           missed data:              NA      
+     truncated data:     12310452 bytes     truncated data:            0 bytes
+     truncated packets:      8882 pkts      truncated packets:         0 pkts 
+     data xmit time:       13.142 secs      data xmit time:        0.000 secs 
+     idletime max:           60.9 ms        idletime max:           60.9 ms   
+     throughput:           955916 Bps       throughput:                0 Bps  
