@@ -15,9 +15,18 @@ What's not very relevant:
 
 What's very relevant:
 - output.py contains utilities for creating plots! (requires matplotlib)
-- 2017-05-21-cpu-limit is the latest Mininet experiment data
-- aws4 is the latest AWS experiment data
+- 2017-05-21-cpu-limit is the Mininet experiment data reported in my thesis
+- aws4 is the AWS experiment data reported in my thesis
 - cap contains captures from Mininet experiments (src/make_captures.sh)
+  (reported in thesis)
+
+Later data: data from 2018 is after my thesis publication, and was created after
+a bug was discovered in which OpenVPN was encrypting and signing packets. The
+data adopts a much simpler naming convention: DATE-TYPE, where TYPE can be:
+- MAIN (normal mininet results)
+- EXT (mininet results with extended parameter ranges)
+- CAP (captures)
+- AWS (aws experiments)
 
 Mininet Results
 ---------------
