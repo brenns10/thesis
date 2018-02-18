@@ -1,0 +1,155 @@
+1 arg remaining, starting with 'sym_delayed.vpn.vanilla.pcap'
+Ostermann's tcptrace -- version 6.6.7 -- Thu Nov  4, 2004
+
+13441 packets seen, 13441 TCP packets traced
+elapsed wallclock time: 0:00:00.027691, 485392 pkts/sec analyzed
+trace file elapsed time: 0:00:12.195133
+TCP connection info:
+3 TCP connections traced:
+TCP connection 1:
+	host a:        10.0.6.2:43152
+	host b:        10.0.3.2:5201
+	complete conn: yes
+	first packet:  Wed Feb 14 10:12:47.341204 2018
+	last packet:   Wed Feb 14 10:12:59.536337 2018
+	elapsed time:  0:00:12.195133
+	total packets: 45
+	filename:      sym_delayed.vpn.vanilla.pcap
+   a->b:			      b->a:
+     total packets:            24           total packets:            21      
+     ack pkts sent:            23           ack pkts sent:            21      
+     pure acks sent:           12           pure acks sent:           10      
+     sack pkts sent:            1           sack pkts sent:            2      
+     dsack pkts sent:           1           dsack pkts sent:           2      
+     max sack blks/ack:         1           max sack blks/ack:         1      
+     unique bytes sent:       297           unique bytes sent:       198      
+     actual data pkts:         10           actual data pkts:          9      
+     actual data bytes:       299           actual data bytes:       199      
+     rexmt data pkts:           2           rexmt data pkts:           1      
+     rexmt data bytes:          2           rexmt data bytes:          1      
+     zwnd probe pkts:           0           zwnd probe pkts:           0      
+     zwnd probe bytes:          0           zwnd probe bytes:          0      
+     outoforder pkts:           0           outoforder pkts:           0      
+     pushed data pkts:         10           pushed data pkts:          9      
+     SYN/FIN pkts sent:       1/1           SYN/FIN pkts sent:       1/1      
+     req 1323 ws/ts:          Y/Y           req 1323 ws/ts:          Y/Y      
+     adv wind scale:            9           adv wind scale:            9      
+     req sack:                  Y           req sack:                  Y      
+     sacks sent:                1           sacks sent:                2      
+     urgent data pkts:          0 pkts      urgent data pkts:          0 pkts 
+     urgent data bytes:         0 bytes     urgent data bytes:         0 bytes
+     mss requested:          1405 bytes     mss requested:          1460 bytes
+     max segm size:           192 bytes     max segm size:           188 bytes
+     min segm size:             1 bytes     min segm size:             1 bytes
+     avg segm size:            29 bytes     avg segm size:            22 bytes
+     max win adv:           29696 bytes     max win adv:           29696 bytes
+     min win adv:           29696 bytes     min win adv:           28672 bytes
+     zero win adv:              0 times     zero win adv:              0 times
+     avg win adv:           29696 bytes     avg win adv:           28979 bytes
+     initial window:           37 bytes     initial window:            1 bytes
+     initial window:            1 pkts      initial window:            1 pkts 
+     ttl stream length:       297 bytes     ttl stream length:       198 bytes
+     missed data:               0 bytes     missed data:               0 bytes
+     truncated data:          165 bytes     truncated data:          146 bytes
+     truncated packets:         2 pkts      truncated packets:         1 pkts 
+     data xmit time:       12.057 secs      data xmit time:       11.990 secs 
+     idletime max:        10133.4 ms        idletime max:        10220.0 ms   
+     throughput:               24 Bps       throughput:               16 Bps  
+================================
+TCP connection 2:
+	host c:        10.0.6.2:43153
+	host d:        10.0.3.2:5201
+	complete conn: RESET	(SYNs: 2)  (FINs: 1)
+	first packet:  Wed Feb 14 10:12:47.635549 2018
+	last packet:   Wed Feb 14 10:12:59.329640 2018
+	elapsed time:  0:00:11.694091
+	total packets: 13176
+	filename:      sym_delayed.vpn.vanilla.pcap
+   c->d:			      d->c:
+     total packets:          8638           total packets:          4538      
+     resets sent:               2           resets sent:               0      
+     ack pkts sent:          8636           ack pkts sent:          4538      
+     pure acks sent:            1           pure acks sent:         4535      
+     sack pkts sent:            0           sack pkts sent:            0      
+     dsack pkts sent:           0           dsack pkts sent:           0      
+     max sack blks/ack:         0           max sack blks/ack:         0      
+     unique bytes sent:  11853146           unique bytes sent:         0      
+     actual data pkts:       8634           actual data pkts:          0      
+     actual data bytes:  11853146           actual data bytes:         0      
+     rexmt data pkts:           0           rexmt data pkts:           1      
+     rexmt data bytes:          0           rexmt data bytes:          1      
+     zwnd probe pkts:           0           zwnd probe pkts:           0      
+     zwnd probe bytes:          0           zwnd probe bytes:          0      
+     outoforder pkts:           0           outoforder pkts:           0      
+     pushed data pkts:         72           pushed data pkts:          0      
+     SYN/FIN pkts sent:       1/0           SYN/FIN pkts sent:       1/2      
+     req 1323 ws/ts:          Y/Y           req 1323 ws/ts:          Y/Y      
+     adv wind scale:            9           adv wind scale:            9      
+     req sack:                  Y           req sack:                  Y      
+     sacks sent:                0           sacks sent:                0      
+     urgent data pkts:          0 pkts      urgent data pkts:          0 pkts 
+     urgent data bytes:         0 bytes     urgent data bytes:         0 bytes
+     mss requested:          1405 bytes     mss requested:          1460 bytes
+     max segm size:          1373 bytes     max segm size:             0 bytes
+     min segm size:            37 bytes     min segm size:             0 bytes
+     avg segm size:          1372 bytes     avg segm size:             0 bytes
+     max win adv:           29696 bytes     max win adv:         1229312 bytes
+     min win adv:           29696 bytes     min win adv:           28672 bytes
+     zero win adv:              0 times     zero win adv:              0 times
+     avg win adv:           29689 bytes     avg win adv:          738686 bytes
+     initial window:           37 bytes     initial window:            0 bytes
+     initial window:            1 pkts      initial window:            0 pkts 
+     ttl stream length:        NA           ttl stream length:         0 bytes
+     missed data:              NA           missed data:               0 bytes
+     truncated data:     11490523 bytes     truncated data:            0 bytes
+     truncated packets:      8633 pkts      truncated packets:         0 pkts 
+     data xmit time:       11.534 secs      data xmit time:        0.000 secs 
+     idletime max:          211.4 ms        idletime max:          206.5 ms   
+     throughput:          1013601 Bps       throughput:                0 Bps  
+================================
+TCP connection 3:
+	host e:        10.8.0.4:43153
+	host f:        10.0.3.2:5201
+	complete conn: RESET	(SYNs: 0)  (FINs: 0)
+	first packet:  Wed Feb 14 10:12:59.271500 2018
+	last packet:   Wed Feb 14 10:12:59.327327 2018
+	elapsed time:  0:00:00.055827
+	total packets: 220
+	filename:      sym_delayed.vpn.vanilla.pcap
+   e->f:			      f->e:
+     total packets:           220           total packets:             0      
+     resets sent:             220           resets sent:               0      
+     ack pkts sent:             0           ack pkts sent:             0      
+     pure acks sent:            0           pure acks sent:            0      
+     sack pkts sent:            0           sack pkts sent:            0      
+     dsack pkts sent:           0           dsack pkts sent:           0      
+     max sack blks/ack:         0           max sack blks/ack:         0      
+     unique bytes sent:         0           unique bytes sent:         0      
+     actual data pkts:          0           actual data pkts:          0      
+     actual data bytes:         0           actual data bytes:         0      
+     rexmt data pkts:           0           rexmt data pkts:           0      
+     rexmt data bytes:          0           rexmt data bytes:          0      
+     zwnd probe pkts:           0           zwnd probe pkts:           0      
+     zwnd probe bytes:          0           zwnd probe bytes:          0      
+     outoforder pkts:           0           outoforder pkts:           0      
+     pushed data pkts:          0           pushed data pkts:          0      
+     SYN/FIN pkts sent:       0/0           SYN/FIN pkts sent:       0/0      
+     urgent data pkts:          0 pkts      urgent data pkts:          0 pkts 
+     urgent data bytes:         0 bytes     urgent data bytes:         0 bytes
+     mss requested:             0 bytes     mss requested:             0 bytes
+     max segm size:             0 bytes     max segm size:             0 bytes
+     min segm size:             0 bytes     min segm size:             0 bytes
+     avg segm size:             0 bytes     avg segm size:             0 bytes
+     max win adv:               0 bytes     max win adv:               0 bytes
+     min win adv:               0 bytes     min win adv:               0 bytes
+     zero win adv:              0 times     zero win adv:              0 times
+     avg win adv:               0 bytes     avg win adv:               0 bytes
+     initial window:            0 bytes     initial window:            0 bytes
+     initial window:            0 pkts      initial window:            0 pkts 
+     ttl stream length:        NA           ttl stream length:        NA      
+     missed data:              NA           missed data:              NA      
+     truncated data:            0 bytes     truncated data:            0 bytes
+     truncated packets:         0 pkts      truncated packets:         0 pkts 
+     data xmit time:        0.000 secs      data xmit time:        0.000 secs 
+     idletime max:            4.1 ms        idletime max:             NA ms   
+     throughput:                0 Bps       throughput:                0 Bps  
