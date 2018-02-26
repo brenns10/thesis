@@ -25,9 +25,13 @@ SCEN = {
 def make_throughput_plot():
     data = []
     labels = []
+    text = 'AWS'
     for s, label in SCEN.items():
-        data.append(o.get_numpy_array('%s.json' % s) / 1000000)
+        arr = o.get_numpy_array('%s.json' % s) / 1000000
+        data.append(arr)
+        text += ' & %.2f (%.2f)' % (arr.mean(), arr.std())
         labels.append(label)
+    print(text + r' \\')
 
     fig, ax = plt.subplots()
     print(list(map(len, data)))
