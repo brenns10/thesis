@@ -37,7 +37,7 @@ def make_throughput_plot():
     print(list(map(len, data)))
     ax.boxplot(data, 0, '', labels=labels)
     ax.set_ylabel('Throughput (Mbps)')
-    ax.set_title('Throughput Comparison: AWS')
+    #ax.set_title('Throughput Comparison: AWS')
     fig.savefig('aws.pdf')
 
 
